@@ -91,6 +91,12 @@ const Login: React.FC<LoginProps> = ({ onClose, onSwitchToRegister }) => {
               </div>
             )}
 
+            <div className="text-xs text-gray-500 bg-gray-50 p-3 rounded">
+              <strong>Tài khoản mặc định:</strong><br />
+              Email: admin@phinpt.com<br />
+              Password: admin123
+            </div>
+
             <div className="flex space-x-3">
               <button
                 type="button"
