@@ -5,7 +5,6 @@ import {
   Trash2,
   User,
   Mail,
-  Phone,
   Search,
   Filter,
   X,
@@ -35,12 +34,9 @@ const UserManagement: React.FC = () => {
     "all"
   );
   const [formData, setFormData] = useState({
-    username: "",
     email: "",
-    fullName: "",
-    phone: "",
-    role: "client" as "admin" | "client",
     password: "",
+    role: "client" as "admin" | "client",
     avatar: "",
   });
 
@@ -60,6 +56,18 @@ const UserManagement: React.FC = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      alert('Email không hợp lệ');
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      alert('Mật khẩu phải có ít nhất 6 ký tự');
+      return;
+    }
+
     const allUsers = JSON.parse(localStorage.getItem("pt_users") || "[]");
 
     if (editingUser) {
@@ -68,7 +76,9 @@ const UserManagement: React.FC = () => {
         u.id === editingUser.id
           ? {
               ...u,
-              ...formData,
+              email: formData.email,
+              role: formData.role,
+              avatar: formData.avatar,
               password: formData.password || u.password,
             }
           : u
@@ -76,10 +86,34 @@ const UserManagement: React.FC = () => {
       localStorage.setItem("pt_users", JSON.stringify(updatedUsers));
       setUsers(updatedUsers.map((u: any) => ({ ...u, password: undefined })));
     } else {
+      // Check if email already exists
+      const existingUser = allUsers.find((u: any) => u.email === formData.email);
+      if (existingUser) {
+        alert('Email đã được sử dụng');
+        return;
+      }
+
+      // Generate username from email
+      const username = formData.email.split('@')[0];
+      
+      // Check if username already exists, if so add a number
+      let finalUsername = username;
+      let counter = 1;
+      while (allUsers.find((u: any) => u.username === finalUsername)) {
+        finalUsername = `${username}${counter}`;
+        counter++;
+      }
+
       // Add new user
       const newUser = {
         id: `user-${Date.now()}`,
-        ...formData,
+        username: finalUsername,
+        email: formData.email,
+        fullName: formData.email.split('@')[0], // Use email prefix as default name
+        phone: '',
+        role: formData.role,
+        password: formData.password,
+        avatar: formData.avatar,
         startDate: new Date().toISOString().split("T")[0],
       };
       const updatedUsers = [...allUsers, newUser];
@@ -93,10 +127,7 @@ const UserManagement: React.FC = () => {
   const handleEdit = (user: User) => {
     setEditingUser(user);
     setFormData({
-      username: user.username,
       email: user.email,
-      fullName: user.fullName,
-      phone: user.phone || "",
       role: user.role,
       password: "",
       avatar: user.avatar || "",
@@ -128,12 +159,9 @@ const UserManagement: React.FC = () => {
 
   const resetForm = () => {
     setFormData({
-      username: "",
       email: "",
-      fullName: "",
-      phone: "",
-      role: "client",
       password: "",
+      role: "client",
       avatar: "",
     });
     setEditingUser(null);
@@ -221,12 +249,6 @@ const UserManagement: React.FC = () => {
                         <Mail className="h-4 w-4" />
                         <span>{user.email}</span>
                       </span>
-                      {user.phone && (
-                        <span className="flex items-center space-x-1 text-sm text-gray-600">
-                          <Phone className="h-4 w-4" />
-                          <span>{user.phone}</span>
-                        </span>
-                      )}
                     </div>
                     <div className="mt-2">
                       <span
@@ -297,106 +319,75 @@ const UserManagement: React.FC = () => {
 
             <div className="p-8">
               <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Tên đăng nhập
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.username}
-                      onChange={(e) =>
-                        setFormData({ ...formData, username: e.target.value })
-                      }
-                      className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-fitness-red focus:border-transparent transition-all duration-200"
-                      required
-                    />
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <Mail className="h-4 w-4 inline mr-1" />
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) =>
+                      setFormData({ ...formData, email: e.target.value })
+                    }
+                    className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-fitness-red focus:border-transparent transition-all duration-200"
+                    placeholder="Nhập email"
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Tên đăng nhập và họ tên sẽ được tự động tạo từ email
+                  </p>
+                </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Email
-                    </label>
-                    <input
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) =>
-                        setFormData({ ...formData, email: e.target.value })
-                      }
-                      className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-fitness-red focus:border-transparent transition-all duration-200"
-                      required
-                    />
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Mật khẩu {editingUser && "(để trống nếu không đổi)"}
+                  </label>
+                  <input
+                    type="password"
+                    value={formData.password}
+                    onChange={(e) =>
+                      setFormData({ ...formData, password: e.target.value })
+                    }
+                    className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-fitness-red focus:border-transparent transition-all duration-200"
+                    placeholder="Nhập mật khẩu (tối thiểu 6 ký tự)"
+                    required={!editingUser}
+                  />
+                </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Họ và tên
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.fullName}
-                      onChange={(e) =>
-                        setFormData({ ...formData, fullName: e.target.value })
-                      }
-                      className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-fitness-red focus:border-transparent transition-all duration-200"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Số điện thoại
-                    </label>
-                    <input
-                      type="tel"
-                      value={formData.phone}
-                      onChange={(e) =>
-                        setFormData({ ...formData, phone: e.target.value })
-                      }
-                      className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-fitness-red focus:border-transparent transition-all duration-200"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Vai trò
-                    </label>
-                    <select
-                      value={formData.role}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          role: e.target.value as "admin" | "client",
-                        })
-                      }
-                      className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-fitness-red focus:border-transparent transition-all duration-200"
-                    >
-                      <option value="client">🎯 Học viên</option>
-                      <option value="admin">👑 Admin</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Mật khẩu {editingUser && "(để trống nếu không đổi)"}
-                    </label>
-                    <input
-                      type="password"
-                      value={formData.password}
-                      onChange={(e) =>
-                        setFormData({ ...formData, password: e.target.value })
-                      }
-                      className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-fitness-red focus:border-transparent transition-all duration-200"
-                      required={!editingUser}
-                    />
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Vai trò
+                  </label>
+                  <select
+                    value={formData.role}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        role: e.target.value as "admin" | "client",
+                      })
+                    }
+                    className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-fitness-red focus:border-transparent transition-all duration-200"
+                  >
+                    <option value="client">🎯 Học viên</option>
+                    <option value="admin">👑 Admin</option>
+                  </select>
                 </div>
 
                 <ImageUpload
                   value={formData.avatar}
                   onChange={(url) => setFormData({ ...formData, avatar: url })}
-                  label="Ảnh đại diện"
+                  label="Ảnh đại diện (tùy chọn)"
                 />
+
+                <div className="text-xs p-3 rounded border text-blue-700 bg-blue-50 border-blue-200">
+                  <strong>Lưu ý:</strong> Khi tạo người dùng mới, hệ thống sẽ tự động:
+                  <ul className="list-disc list-inside mt-1 space-y-1">
+                    <li>Tạo tên đăng nhập từ phần trước @ của email</li>
+                    <li>Sử dụng phần trước @ của email làm họ tên mặc định</li>
+                    <li>Gán vai trò đã chọn cho người dùng</li>
+                  </ul>
+                </div>
 
                 <div className="flex space-x-4 pt-6 border-t border-gray-200">
                   <button
