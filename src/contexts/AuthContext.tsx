@@ -42,6 +42,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // If Supabase is not available, set loading to false
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
+
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
@@ -83,6 +89,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
     } catch (error) {
       console.error('Error loading user profile:', error);
+      // If we can't load the profile, create a basic user object from auth data
+      setUser({
+        id: authUser.id,
+        username: authUser.email?.split('@')[0] || 'user',
+        email: authUser.email || '',
+        role: 'client',
+        fullName: authUser.email?.split('@')[0] || 'User',
+      });
     } finally {
       setLoading(false);
     }
@@ -90,6 +104,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
+      if (!supabase) {
+        console.warn('Supabase not available, login failed');
+        return false;
+      }
+      
       await authService.signIn(email, password);
       return true;
     } catch (error) {
@@ -100,6 +119,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const register = async (email: string, password: string): Promise<boolean> => {
     try {
+      if (!supabase) {
+        console.warn('Supabase not available, registration failed');
+        return false;
+      }
+      
       await authService.signUp(email, password);
       return true;
     } catch (error) {
@@ -110,7 +134,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const logout = async (): Promise<void> => {
     try {
-      await authService.signOut();
+      if (supabase) {
+        await authService.signOut();
+      }
     } catch (error) {
       console.error('Logout error:', error);
     }

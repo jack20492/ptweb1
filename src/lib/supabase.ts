@@ -4,10 +4,13 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables');
+  console.warn('Supabase environment variables not found. Some features may not work.');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Create a fallback client if environment variables are missing
+export const supabase = supabaseUrl && supabaseAnonKey 
+  ? createClient(supabaseUrl, supabaseAnonKey)
+  : null;
 
 // Database types
 export interface Database {
