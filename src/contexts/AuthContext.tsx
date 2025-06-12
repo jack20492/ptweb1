@@ -130,10 +130,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const register = async (email: string, password: string): Promise<boolean> => {
     try {
-      // Sign up with Supabase Auth - the database trigger will handle profile creation
+      // Đăng ký với Supabase Auth - trigger sẽ tự động tạo profile
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            full_name: email.split('@')[0], // Tên mặc định từ email
+            role: 'client'
+          }
+        }
       });
 
       if (error) {
@@ -142,10 +148,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       if (data.user) {
-        // Wait a moment for the database trigger to complete profile creation
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Chờ trigger hoàn thành việc tạo profile
+        await new Promise(resolve => setTimeout(resolve, 2000));
         
-        // Load the user profile that was created by the database trigger
+        // Tải profile đã được tạo bởi trigger
         await loadUserProfile(data.user);
         return true;
       }
