@@ -42,11 +42,11 @@ export const useSupabase = () => {
     try {
       // Validate input
       if (!email || !password) {
-        throw new Error('Email and password are required');
+        throw new Error('Email và mật khẩu là bắt buộc');
       }
       
       if (password.length < 6) {
-        throw new Error('Password must be at least 6 characters long');
+        throw new Error('Mật khẩu phải có ít nhất 6 ký tự');
       }
 
       const { data, error } = await supabase.auth.signUp({
@@ -64,11 +64,23 @@ export const useSupabase = () => {
       
       if (error) {
         console.error('Signup error:', error);
+        
+        // Provide more user-friendly error messages in Vietnamese
+        if (error.message.includes('User already registered')) {
+          throw new Error('Email này đã được đăng ký. Vui lòng sử dụng email khác hoặc đăng nhập.');
+        } else if (error.message.includes('Invalid email')) {
+          throw new Error('Định dạng email không hợp lệ. Vui lòng nhập email đúng định dạng.');
+        } else if (error.message.includes('Password should be at least')) {
+          throw new Error('Mật khẩu phải có ít nhất 6 ký tự.');
+        } else if (error.message.includes('Database error saving new user')) {
+          throw new Error('Lỗi hệ thống khi tạo tài khoản. Vui lòng thử lại sau.');
+        }
+        
         throw error;
       }
       
       if (!data.user) {
-        throw new Error('Failed to create user account');
+        throw new Error('Không thể tạo tài khoản người dùng');
       }
 
       return data;
@@ -87,7 +99,7 @@ export const useSupabase = () => {
     try {
       // Validate input
       if (!email || !password) {
-        throw new Error('Email and password are required');
+        throw new Error('Email và mật khẩu là bắt buộc');
       }
 
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -97,15 +109,23 @@ export const useSupabase = () => {
       
       if (error) {
         console.error('SignIn error:', error);
-        // Provide more user-friendly error messages
+        
+        // Provide more user-friendly error messages in Vietnamese
         if (error.message === 'Invalid login credentials') {
-          throw new Error('Invalid email or password. Please check your credentials and try again.');
+          throw new Error('Email hoặc mật khẩu không đúng. Vui lòng kiểm tra lại thông tin đăng nhập.');
+        } else if (error.message.includes('Email not confirmed')) {
+          throw new Error('Tài khoản chưa được xác thực. Vui lòng kiểm tra email để xác thực tài khoản.');
+        } else if (error.message.includes('Too many requests')) {
+          throw new Error('Quá nhiều lần thử đăng nhập. Vui lòng đợi một lúc rồi thử lại.');
+        } else if (error.message.includes('Invalid email')) {
+          throw new Error('Định dạng email không hợp lệ.');
         }
+        
         throw error;
       }
       
       if (!data.user) {
-        throw new Error('Login failed - no user data returned');
+        throw new Error('Đăng nhập thất bại - không nhận được thông tin người dùng');
       }
 
       return data;

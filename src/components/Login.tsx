@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Dumbbell, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Dumbbell, Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
 
 interface LoginProps {
   onClose: () => void;
@@ -25,10 +25,29 @@ const Login: React.FC<LoginProps> = ({ onClose, onSwitchToRegister }) => {
       if (success) {
         onClose();
       } else {
-        setError('Email hoặc mật khẩu không đúng');
+        // Hiển thị thông báo lỗi cụ thể
+        setError('Email hoặc mật khẩu không đúng. Vui lòng kiểm tra lại thông tin đăng nhập.');
       }
-    } catch (err) {
-      setError('Có lỗi xảy ra. Vui lòng thử lại.');
+    } catch (err: any) {
+      // Xử lý các loại lỗi khác nhau
+      let errorMessage = 'Có lỗi xảy ra khi đăng nhập. Vui lòng thử lại.';
+      
+      if (err?.message) {
+        if (err.message.includes('Invalid login credentials') || 
+            err.message.includes('Invalid email or password')) {
+          errorMessage = 'Email hoặc mật khẩu không đúng. Vui lòng kiểm tra lại thông tin đăng nhập.';
+        } else if (err.message.includes('Email not confirmed')) {
+          errorMessage = 'Tài khoản chưa được xác thực. Vui lòng kiểm tra email để xác thực tài khoản.';
+        } else if (err.message.includes('Too many requests')) {
+          errorMessage = 'Quá nhiều lần thử đăng nhập. Vui lòng đợi một lúc rồi thử lại.';
+        } else if (err.message.includes('Network')) {
+          errorMessage = 'Lỗi kết nối mạng. Vui lòng kiểm tra kết nối internet và thử lại.';
+        } else {
+          errorMessage = err.message;
+        }
+      }
+      
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -91,8 +110,18 @@ const Login: React.FC<LoginProps> = ({ onClose, onSwitchToRegister }) => {
             </div>
 
             {error && (
-              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-                {error}
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="flex items-start">
+                  <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 mr-3 flex-shrink-0" />
+                  <div>
+                    <h3 className="text-sm font-medium text-red-800 mb-1">
+                      Đăng nhập thất bại
+                    </h3>
+                    <p className="text-sm text-red-700">
+                      {error}
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
 
