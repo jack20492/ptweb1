@@ -130,7 +130,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const register = async (email: string, password: string): Promise<boolean> => {
     try {
-      // Sign up with Supabase Auth
+      // Sign up with Supabase Auth - the database trigger will handle profile creation
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -142,24 +142,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       if (data.user) {
-        // Create user profile in our users table
-        const username = email.split('@')[0];
+        // Wait a moment for the database trigger to complete profile creation
+        await new Promise(resolve => setTimeout(resolve, 1000));
         
-        const { error: profileError } = await supabase
-          .from('users')
-          .insert({
-            auth_user_id: data.user.id,
-            username,
-            email,
-            full_name: username,
-            role: 'client',
-          });
-
-        if (profileError) {
-          console.error('Profile creation error:', profileError);
-          return false;
-        }
-
+        // Load the user profile that was created by the database trigger
+        await loadUserProfile(data.user);
         return true;
       }
 
