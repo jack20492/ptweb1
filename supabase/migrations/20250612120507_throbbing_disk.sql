@@ -1,0 +1,160 @@
+/*
+  # Fix user profile creation with proper role type
+
+  1. Create user_role enum type
+  2. Create handle_new_user function with proper error handling
+  3. Set up trigger for automatic profile creation
+  4. Configure proper permissions and policies
+*/
+
+-- Create user_role enum type if it doesn't exist
+DO $$ BEGIN
+    CREATE TYPE user_role AS ENUM ('admin', 'client');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+-- Drop existing trigger and function to recreate them properly
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+DROP FUNCTION IF EXISTS public.handle_new_user();
+
+-- Create improved function with better error handling
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
+DECLARE
+  username_value text;
+  full_name_value text;
+  phone_value text;
+  role_value user_role;
+  counter integer := 0;
+  base_username text;
+BEGIN
+  -- Extract and validate metadata
+  base_username := COALESCE(
+    new.raw_user_meta_data->>'username', 
+    split_part(new.email, '@', 1)
+  );
+  
+  username_value := base_username;
+  
+  full_name_value := COALESCE(
+    new.raw_user_meta_data->>'full_name', 
+    new.email
+  );
+  
+  phone_value := new.raw_user_meta_data->>'phone';
+  
+  -- Handle role with proper casting
+  BEGIN
+    role_value := COALESCE(
+      (new.raw_user_meta_data->>'role')::user_role, 
+      'client'::user_role
+    );
+  EXCEPTION WHEN OTHERS THEN
+    role_value := 'client'::user_role;
+  END;
+
+  -- Ensure username is unique by appending counter if needed
+  WHILE EXISTS (SELECT 1 FROM public.users WHERE username = username_value) LOOP
+    counter := counter + 1;
+    username_value := base_username || '_' || counter::text;
+    -- Prevent infinite loop
+    IF counter > 1000 THEN
+      username_value := base_username || '_' || extract(epoch from now())::text;
+      EXIT;
+    END IF;
+  END LOOP;
+
+  -- Insert user record
+  INSERT INTO public.users (
+    auth_user_id,
+    username,
+    email,
+    full_name,
+    phone,
+    role,
+    avatar_url,
+    start_date,
+    created_at,
+    updated_at
+  )
+  VALUES (
+    new.id,
+    username_value,
+    new.email,
+    full_name_value,
+    phone_value,
+    role_value,
+    new.raw_user_meta_data->>'avatar_url',
+    CURRENT_DATE,
+    now(),
+    now()
+  );
+
+  RETURN new;
+EXCEPTION WHEN OTHERS THEN
+  -- Log the error and re-raise it
+  RAISE LOG 'Error in handle_new_user for user %: %', new.id, SQLERRM;
+  RAISE EXCEPTION 'Failed to create user profile: %', SQLERRM;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Recreate the trigger
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- Grant necessary permissions
+GRANT USAGE ON SCHEMA public TO supabase_auth_admin;
+GRANT ALL ON public.users TO supabase_auth_admin;
+GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO supabase_auth_admin;
+
+-- Drop existing auth system policies to recreate them
+DROP POLICY IF EXISTS "Enable insert for auth system" ON public.users;
+DROP POLICY IF EXISTS "Auth system can read users" ON public.users;
+DROP POLICY IF EXISTS "Auth system can update users" ON public.users;
+
+-- Create policy for auth system to insert users
+CREATE POLICY "Enable insert for auth system"
+  ON public.users
+  FOR INSERT
+  TO supabase_auth_admin
+  WITH CHECK (true);
+
+-- Create policy for auth system to read users
+CREATE POLICY "Auth system can read users"
+  ON public.users
+  FOR SELECT
+  TO supabase_auth_admin
+  USING (true);
+
+-- Create policy for auth system to update users if needed
+CREATE POLICY "Auth system can update users"
+  ON public.users
+  FOR UPDATE
+  TO supabase_auth_admin
+  USING (true)
+  WITH CHECK (true);
+
+-- Ensure the function has proper permissions
+ALTER FUNCTION public.handle_new_user() OWNER TO postgres;
+GRANT EXECUTE ON FUNCTION public.handle_new_user() TO supabase_auth_admin;
+
+-- Add helpful comment
+COMMENT ON FUNCTION public.handle_new_user() IS 'Automatically creates a user profile when a new user signs up via Supabase Auth. Includes comprehensive error handling and logging.';
+
+-- Verify no admin users exist and provide guidance
+DO $$
+DECLARE
+  admin_count integer;
+BEGIN
+  SELECT COUNT(*) INTO admin_count FROM public.users WHERE role = 'admin';
+  
+  IF admin_count = 0 THEN
+    RAISE NOTICE 'No admin users found. You can create an admin user by:';
+    RAISE NOTICE '1. Signing up through the application with role set to admin';
+    RAISE NOTICE '2. Or manually updating a user role in the users table';
+  ELSE
+    RAISE NOTICE 'Found % admin user(s) in the system', admin_count;
+  END IF;
+END $$;
