@@ -9,7 +9,6 @@ import {
   Filter,
   X,
 } from "lucide-react";
-import ImageUpload from "../ImageUpload";
 
 interface User {
   id: string;
@@ -37,7 +36,6 @@ const UserManagement: React.FC = () => {
     email: "",
     password: "",
     role: "client" as "admin" | "client",
-    avatar: "",
   });
 
   // Xoá xác nhận popup state
@@ -78,7 +76,6 @@ const UserManagement: React.FC = () => {
               ...u,
               email: formData.email,
               role: formData.role,
-              avatar: formData.avatar,
               password: formData.password || u.password,
             }
           : u
@@ -113,7 +110,6 @@ const UserManagement: React.FC = () => {
         phone: '',
         role: formData.role,
         password: formData.password,
-        avatar: formData.avatar,
         startDate: new Date().toISOString().split("T")[0],
       };
       const updatedUsers = [...allUsers, newUser];
@@ -130,7 +126,6 @@ const UserManagement: React.FC = () => {
       email: user.email,
       role: user.role,
       password: "",
-      avatar: user.avatar || "",
     });
     setShowForm(true);
   };
@@ -162,7 +157,6 @@ const UserManagement: React.FC = () => {
       email: "",
       password: "",
       role: "client",
-      avatar: "",
     });
     setEditingUser(null);
     setShowForm(false);
@@ -373,12 +367,6 @@ const UserManagement: React.FC = () => {
                     <option value="admin">👑 Admin</option>
                   </select>
                 </div>
-
-                <ImageUpload
-                  value={formData.avatar}
-                  onChange={(url) => setFormData({ ...formData, avatar: url })}
-                  label="Ảnh đại diện (tùy chọn)"
-                />
 
                 <div className="text-xs p-3 rounded border text-blue-700 bg-blue-50 border-blue-200">
                   <strong>Lưu ý:</strong> Khi tạo người dùng mới, hệ thống sẽ tự động:
