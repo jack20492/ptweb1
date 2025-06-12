@@ -21,25 +21,59 @@ export const useSupabase = () => {
 
   const handleError = (error: any) => {
     console.error('Supabase error:', error);
-    setError(error.message || 'An error occurred');
+    let errorMessage = 'An error occurred';
+    
+    if (error?.message) {
+      errorMessage = error.message;
+    } else if (error?.error_description) {
+      errorMessage = error.error_description;
+    } else if (typeof error === 'string') {
+      errorMessage = error;
+    }
+    
+    setError(errorMessage);
     setLoading(false);
   };
 
-  // Auth functions
+  // Auth functions with improved error handling
   const signUp = async (email: string, password: string, userData: any) => {
     setLoading(true);
     setError(null);
     try {
+      // Validate input
+      if (!email || !password) {
+        throw new Error('Email and password are required');
+      }
+      
+      if (password.length < 6) {
+        throw new Error('Password must be at least 6 characters long');
+      }
+
       const { data, error } = await supabase.auth.signUp({
-        email,
+        email: email.trim().toLowerCase(),
         password,
         options: {
-          data: userData
+          data: {
+            username: userData.username?.trim(),
+            full_name: userData.full_name?.trim(),
+            phone: userData.phone?.trim(),
+            role: userData.role || 'client'
+          }
         }
       });
-      if (error) throw error;
+      
+      if (error) {
+        console.error('Signup error:', error);
+        throw error;
+      }
+      
+      if (!data.user) {
+        throw new Error('Failed to create user account');
+      }
+
       return data;
-    } catch (error) {
+    } catch (error: any) {
+      console.error('SignUp error details:', error);
       handleError(error);
       return null;
     } finally {
@@ -51,13 +85,32 @@ export const useSupabase = () => {
     setLoading(true);
     setError(null);
     try {
+      // Validate input
+      if (!email || !password) {
+        throw new Error('Email and password are required');
+      }
+
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: email.trim().toLowerCase(),
         password
       });
-      if (error) throw error;
+      
+      if (error) {
+        console.error('SignIn error:', error);
+        // Provide more user-friendly error messages
+        if (error.message === 'Invalid login credentials') {
+          throw new Error('Invalid email or password. Please check your credentials and try again.');
+        }
+        throw error;
+      }
+      
+      if (!data.user) {
+        throw new Error('Login failed - no user data returned');
+      }
+
       return data;
-    } catch (error) {
+    } catch (error: any) {
+      console.error('SignIn error details:', error);
       handleError(error);
       return null;
     } finally {

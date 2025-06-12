@@ -38,25 +38,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     // Get initial session
     const getInitialSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        const profile = await getProfile(session.user.id);
-        if (profile) {
-          setUser({
-            ...profile,
-            email: session.user.email || ''
-          });
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Error getting session:', error);
+          setLoading(false);
+          return;
         }
-      }
-      setLoading(false);
-    };
 
-    getInitialSession();
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (event === 'SIGNED_IN' && session?.user) {
+        if (session?.user) {
           const profile = await getProfile(session.user.id);
           if (profile) {
             setUser({
@@ -64,10 +55,38 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               email: session.user.email || ''
             });
           }
-        } else if (event === 'SIGNED_OUT') {
-          setUser(null);
         }
+      } catch (error) {
+        console.error('Error in getInitialSession:', error);
+      } finally {
         setLoading(false);
+      }
+    };
+
+    getInitialSession();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('Auth state changed:', event, session?.user?.id);
+        
+        try {
+          if (event === 'SIGNED_IN' && session?.user) {
+            const profile = await getProfile(session.user.id);
+            if (profile) {
+              setUser({
+                ...profile,
+                email: session.user.email || ''
+              });
+            }
+          } else if (event === 'SIGNED_OUT') {
+            setUser(null);
+          }
+        } catch (error) {
+          console.error('Error handling auth state change:', error);
+        } finally {
+          setLoading(false);
+        }
       }
     );
 
@@ -76,30 +95,52 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
+      setLoading(true);
       const result = await signIn(email, password);
-      return !!result?.user;
+      
+      if (result?.user) {
+        // The auth state change listener will handle setting the user
+        return true;
+      }
+      
+      return false;
     } catch (error) {
       console.error('Login error:', error);
       return false;
+    } finally {
+      setLoading(false);
     }
   };
 
   const register = async (email: string, password: string, userData: any): Promise<boolean> => {
     try {
+      setLoading(true);
       const result = await signUp(email, password, userData);
-      return !!result?.user;
+      
+      if (result?.user) {
+        // For email confirmation disabled, user should be signed in immediately
+        // The auth state change listener will handle setting the user
+        return true;
+      }
+      
+      return false;
     } catch (error) {
       console.error('Register error:', error);
       return false;
+    } finally {
+      setLoading(false);
     }
   };
 
   const logout = async (): Promise<void> => {
     try {
+      setLoading(true);
       await signOut();
       setUser(null);
     } catch (error) {
       console.error('Logout error:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
