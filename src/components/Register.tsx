@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Dumbbell, Eye, EyeOff, User, Mail, Phone, UserPlus, Shield } from 'lucide-react';
+import { Dumbbell, Eye, EyeOff, User, Mail, Phone, UserPlus, Shield, CheckCircle, X } from 'lucide-react';
 
 interface RegisterProps {
   onClose: () => void;
@@ -21,6 +21,8 @@ const Register: React.FC<RegisterProps> = ({ onClose, onSwitchToLogin }) => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,10 +71,18 @@ const Register: React.FC<RegisterProps> = ({ onClose, onSwitchToLogin }) => {
       const updatedUsers = [...users, newUser];
       localStorage.setItem('pt_users', JSON.stringify(updatedUsers));
 
-      // Show success message and redirect to login
-      alert(`Đăng ký ${formData.role === 'admin' ? 'tài khoản admin' : 'tài khoản học viên'} thành công! Bạn có thể đăng nhập ngay bây giờ.`);
-      onClose();
-      onSwitchToLogin();
+      // Show custom success notification
+      const message = `Đăng ký ${formData.role === 'admin' ? 'tài khoản admin' : 'tài khoản học viên'} thành công! Bạn có thể đăng nhập ngay bây giờ.`;
+      setSuccessMessage(message);
+      setShowSuccess(true);
+
+      // Auto redirect to login after 2 seconds
+      setTimeout(() => {
+        setShowSuccess(false);
+        onClose();
+        onSwitchToLogin();
+      }, 2000);
+
     } catch (error) {
       setError('Có lỗi xảy ra. Vui lòng thử lại.');
     } finally {
@@ -86,6 +96,40 @@ const Register: React.FC<RegisterProps> = ({ onClose, onSwitchToLogin }) => {
       [e.target.name]: e.target.value
     });
   };
+
+  // Success notification popup
+  if (showSuccess) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 text-center">
+          <div className="bg-green-100 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-6">
+            <CheckCircle className="h-12 w-12 text-green-600" />
+          </div>
+          <h3 className="text-2xl font-bold text-gray-900 mb-4">
+            🎉 Đăng ký thành công!
+          </h3>
+          <p className="text-gray-600 mb-6 leading-relaxed">
+            {successMessage}
+          </p>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <p className="text-blue-800 text-sm">
+              ⏱️ Tự động chuyển đến trang đăng nhập sau 2 giây...
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              setShowSuccess(false);
+              onClose();
+              onSwitchToLogin();
+            }}
+            className="w-full px-6 py-3 bg-gradient-to-r from-fitness-red to-red-600 text-white rounded-lg hover:from-red-600 hover:to-red-700 transition-all duration-200 font-medium"
+          >
+            Đăng nhập ngay
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
