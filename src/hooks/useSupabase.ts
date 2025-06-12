@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, testSupabaseConnection } from '../lib/supabase';
 import type { 
   Profile, 
   WorkoutPlan, 
@@ -23,7 +23,21 @@ export const useSupabase = () => {
     console.error('Supabase error:', error);
     let errorMessage = 'An error occurred';
     
-    if (error?.message) {
+    // Enhanced error handling for connection issues
+    if (error?.message?.includes('Failed to fetch') || error?.name === 'TypeError') {
+      errorMessage = 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối internet và thử lại.';
+      console.error('Connection error detected. This might be due to:');
+      console.error('1. Invalid Supabase URL or API key');
+      console.error('2. Network connectivity issues');
+      console.error('3. Supabase service unavailable');
+      
+      // Test connection to provide more specific error info
+      testSupabaseConnection().then(isConnected => {
+        if (!isConnected) {
+          console.error('Supabase connection test failed. Please verify your configuration.');
+        }
+      });
+    } else if (error?.message) {
       errorMessage = error.message;
     } else if (error?.error_description) {
       errorMessage = error.error_description;
@@ -72,6 +86,12 @@ export const useSupabase = () => {
     setLoading(true);
     setError(null);
     try {
+      // Test connection first
+      const isConnected = await testSupabaseConnection();
+      if (!isConnected) {
+        throw new Error('Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối internet.');
+      }
+
       // Validate input
       if (!email || !password) {
         throw new Error('Email và mật khẩu là bắt buộc');
@@ -129,6 +149,12 @@ export const useSupabase = () => {
     setLoading(true);
     setError(null);
     try {
+      // Test connection first
+      const isConnected = await testSupabaseConnection();
+      if (!isConnected) {
+        throw new Error('Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối internet.');
+      }
+
       // Validate input
       if (!emailOrUsername || !password) {
         throw new Error('Email/tên đăng nhập và mật khẩu là bắt buộc');
@@ -201,6 +227,12 @@ export const useSupabase = () => {
     setLoading(true);
     setError(null);
     try {
+      // Test connection first
+      const isConnected = await testSupabaseConnection();
+      if (!isConnected) {
+        throw new Error('Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối internet.');
+      }
+
       const { data, error } = await supabase
         .from('profiles')
         .select('*')

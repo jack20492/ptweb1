@@ -14,6 +14,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   isAdmin: boolean;
   loading: boolean;
+  error: string | null;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -33,31 +34,51 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const { signIn, signUp, signOut, getProfile } = useSupabase();
 
   useEffect(() => {
     // Get initial session
     const getInitialSession = async () => {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession();
+        setError(null);
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
-        if (error) {
-          console.error('Error getting session:', error);
+        if (sessionError) {
+          console.error('Error getting session:', sessionError);
+          if (sessionError.message?.includes('Failed to fetch')) {
+            setError('Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối internet và thử lại.');
+          } else {
+            setError('Lỗi xác thực. Vui lòng thử lại.');
+          }
           setLoading(false);
           return;
         }
 
         if (session?.user) {
-          const profile = await getProfile(session.user.id);
-          if (profile) {
-            setUser({
-              ...profile,
-              email: session.user.email || ''
-            });
+          try {
+            const profile = await getProfile(session.user.id);
+            if (profile) {
+              setUser({
+                ...profile,
+                email: session.user.email || ''
+              });
+            } else {
+              console.warn('No profile found for user:', session.user.id);
+              setError('Không tìm thấy thông tin người dùng. Vui lòng liên hệ quản trị viên.');
+            }
+          } catch (profileError) {
+            console.error('Error fetching profile:', profileError);
+            setError('Không thể tải thông tin người dùng. Vui lòng thử lại.');
           }
         }
       } catch (error) {
         console.error('Error in getInitialSession:', error);
+        if (error instanceof Error && error.message?.includes('Failed to fetch')) {
+          setError('Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối internet và cấu hình Supabase.');
+        } else {
+          setError('Lỗi hệ thống. Vui lòng thử lại sau.');
+        }
       } finally {
         setLoading(false);
       }
@@ -71,6 +92,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.log('Auth state changed:', event, session?.user?.id);
         
         try {
+          setError(null);
           if (event === 'SIGNED_IN' && session?.user) {
             const profile = await getProfile(session.user.id);
             if (profile) {
@@ -84,6 +106,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           }
         } catch (error) {
           console.error('Error handling auth state change:', error);
+          if (error instanceof Error && error.message?.includes('Failed to fetch')) {
+            setError('Mất kết nối với máy chủ. Vui lòng kiểm tra kết nối internet.');
+          } else {
+            setError('Lỗi xác thực. Vui lòng thử lại.');
+          }
         } finally {
           setLoading(false);
         }
@@ -96,6 +123,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = async (emailOrUsername: string, password: string): Promise<boolean> => {
     try {
       setLoading(true);
+      setError(null);
       const result = await signIn(emailOrUsername, password);
       
       if (result?.user) {
@@ -106,6 +134,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       return false;
     } catch (error) {
       console.error('Login error:', error);
+      if (error instanceof Error && error.message?.includes('Failed to fetch')) {
+        setError('Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối internet.');
+      } else {
+        setError('Đăng nhập thất bại. Vui lòng thử lại.');
+      }
       return false;
     } finally {
       setLoading(false);
@@ -115,6 +148,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const register = async (email: string, password: string, userData: any): Promise<boolean> => {
     try {
       setLoading(true);
+      setError(null);
       const result = await signUp(email, password, userData);
       
       if (result?.user) {
@@ -126,6 +160,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       return false;
     } catch (error) {
       console.error('Register error:', error);
+      if (error instanceof Error && error.message?.includes('Failed to fetch')) {
+        setError('Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối internet.');
+      } else {
+        setError('Đăng ký thất bại. Vui lòng thử lại.');
+      }
       return false;
     } finally {
       setLoading(false);
@@ -135,10 +174,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const logout = async (): Promise<void> => {
     try {
       setLoading(true);
+      setError(null);
       await signOut();
       setUser(null);
     } catch (error) {
       console.error('Logout error:', error);
+      if (error instanceof Error && error.message?.includes('Failed to fetch')) {
+        setError('Không thể kết nối đến máy chủ khi đăng xuất.');
+      } else {
+        setError('Lỗi khi đăng xuất. Vui lòng thử lại.');
+      }
     } finally {
       setLoading(false);
     }
@@ -153,7 +198,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       register, 
       logout, 
       isAdmin, 
-      loading 
+      loading,
+      error
     }}>
       {children}
     </AuthContext.Provider>
