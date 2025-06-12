@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { supabase } from '../lib/supabase';
+import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 interface User {
   id: string;
@@ -46,27 +48,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setLoading(true);
       
-      // Initialize default admin account if no users exist
-      const users = JSON.parse(localStorage.getItem('pt_users') || '[]');
-      if (users.length === 0) {
-        const defaultAdmin = {
-          id: 'admin-1',
-          username: 'admin',
-          email: 'admin@phinpt.com',
-          role: 'admin',
-          fullName: 'Phi Nguyễn PT',
-          phone: '0123456789',
-          password: 'admin123'
-        };
-        users.push(defaultAdmin);
-        localStorage.setItem('pt_users', JSON.stringify(users));
+      // Get current session
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session?.user) {
+        await loadUserProfile(session.user);
       }
 
-      // Check if user is logged in
-      const savedUser = localStorage.getItem('pt_current_user');
-      if (savedUser) {
-        setUser(JSON.parse(savedUser));
-      }
+      // Listen for auth changes
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(
+        async (event, session) => {
+          if (session?.user) {
+            await loadUserProfile(session.user);
+          } else {
+            setUser(null);
+          }
+        }
+      );
+
+      return () => subscription.unsubscribe();
     } catch (error) {
       console.error('Auth initialization failed:', error);
     } finally {
@@ -74,19 +74,50 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const loadUserProfile = async (authUser: SupabaseUser) => {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('auth_user_id', authUser.id)
+        .single();
+
+      if (error) {
+        console.error('Error loading user profile:', error);
+        return;
+      }
+
+      if (data) {
+        setUser({
+          id: data.id,
+          username: data.username,
+          email: data.email,
+          role: data.role,
+          fullName: data.full_name,
+          phone: data.phone || undefined,
+          avatar: data.avatar_url || undefined,
+          startDate: data.start_date || undefined,
+        });
+      }
+    } catch (error) {
+      console.error('Error loading user profile:', error);
+    }
+  };
+
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
-      const users = JSON.parse(localStorage.getItem('pt_users') || '[]');
-      
-      const foundUser = users.find((u: any) => 
-        u.email === email && u.password === password
-      );
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-      if (foundUser) {
-        const userWithoutPassword = { ...foundUser };
-        delete userWithoutPassword.password;
-        setUser(userWithoutPassword);
-        localStorage.setItem('pt_current_user', JSON.stringify(userWithoutPassword));
+      if (error) {
+        console.error('Login error:', error);
+        return false;
+      }
+
+      if (data.user) {
+        await loadUserProfile(data.user);
         return true;
       }
 
@@ -99,38 +130,40 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const register = async (email: string, password: string): Promise<boolean> => {
     try {
-      const users = JSON.parse(localStorage.getItem('pt_users') || '[]');
-      
-      // Check if email already exists
-      const existingUser = users.find((u: any) => u.email === email);
-      if (existingUser) {
+      // Sign up with Supabase Auth
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+
+      if (error) {
+        console.error('Registration error:', error);
         return false;
       }
 
-      // Generate username from email
-      const username = email.split('@')[0];
-      let finalUsername = username;
-      let counter = 1;
-      while (users.find((u: any) => u.username === finalUsername)) {
-        finalUsername = `${username}${counter}`;
-        counter++;
+      if (data.user) {
+        // Create user profile in our users table
+        const username = email.split('@')[0];
+        
+        const { error: profileError } = await supabase
+          .from('users')
+          .insert({
+            auth_user_id: data.user.id,
+            username,
+            email,
+            full_name: username,
+            role: 'client',
+          });
+
+        if (profileError) {
+          console.error('Profile creation error:', profileError);
+          return false;
+        }
+
+        return true;
       }
 
-      // Create new user
-      const newUser = {
-        id: `user-${Date.now()}`,
-        username: finalUsername,
-        email,
-        fullName: username,
-        phone: '',
-        role: 'client',
-        password,
-        startDate: new Date().toISOString().split('T')[0]
-      };
-
-      users.push(newUser);
-      localStorage.setItem('pt_users', JSON.stringify(users));
-      return true;
+      return false;
     } catch (error) {
       console.error('Registration error:', error);
       return false;
@@ -138,8 +171,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const logout = async (): Promise<void> => {
-    setUser(null);
-    localStorage.removeItem('pt_current_user');
+    try {
+      await supabase.auth.signOut();
+      setUser(null);
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
 
   const isAdmin = user?.role === 'admin';

@@ -6,6 +6,7 @@ import React, {
   ReactNode,
 } from "react";
 import { useAuth } from './AuthContext';
+import { supabase } from '../lib/supabase';
 
 interface Exercise {
   id: string;
@@ -171,86 +172,97 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({
     loadData();
   }, [user, isAdmin]);
 
-  const loadData = () => {
+  const loadData = async () => {
     try {
       setLoading(true);
       
-      // Load data from localStorage
-      const savedWorkoutPlans = localStorage.getItem("pt_workout_plans");
-      if (savedWorkoutPlans) {
-        setWorkoutPlans(JSON.parse(savedWorkoutPlans));
+      // Load testimonials
+      const { data: testimonialsData } = await supabase
+        .from('testimonials')
+        .select('*')
+        .eq('is_active', true);
+      
+      if (testimonialsData) {
+        setTestimonials(testimonialsData.map(t => ({
+          id: t.id,
+          name: t.name,
+          content: t.content,
+          rating: t.rating,
+          avatar: t.avatar_url || undefined,
+          beforeImage: t.before_image_url || undefined,
+          afterImage: t.after_image_url || undefined,
+        })));
       }
 
-      const savedMealPlans = localStorage.getItem("pt_meal_plans");
-      if (savedMealPlans) {
-        setMealPlans(JSON.parse(savedMealPlans));
+      // Load videos
+      const { data: videosData } = await supabase
+        .from('videos')
+        .select('*')
+        .eq('is_active', true);
+      
+      if (videosData) {
+        setVideos(videosData.map(v => ({
+          id: v.id,
+          title: v.title,
+          youtubeId: v.youtube_id,
+          description: v.description,
+          category: v.category,
+        })));
       }
 
-      const savedWeightRecords = localStorage.getItem("pt_weight_records");
-      if (savedWeightRecords) {
-        setWeightRecords(JSON.parse(savedWeightRecords));
+      // Load home content
+      const { data: homeContentData } = await supabase
+        .from('home_content')
+        .select('*')
+        .limit(1)
+        .single();
+      
+      if (homeContentData) {
+        setHomeContent({
+          heroTitle: homeContentData.hero_title,
+          heroSubtitle: homeContentData.hero_subtitle,
+          heroImage: homeContentData.hero_image_url || undefined,
+          aboutText: homeContentData.about_text,
+          aboutImage: homeContentData.about_image_url || undefined,
+          servicesTitle: homeContentData.services_title,
+          services: homeContentData.services || [],
+        });
       }
 
-      const savedTestimonials = localStorage.getItem("pt_testimonials");
-      if (savedTestimonials) {
-        setTestimonials(JSON.parse(savedTestimonials));
-      } else {
-        // Set default testimonials
-        const defaultTestimonials: Testimonial[] = [
-          {
-            id: "1",
-            name: "Nguyễn Minh Anh",
-            content:
-              "Sau 3 tháng tập với PT Phi, tôi đã giảm được 8kg và cảm thấy khỏe khoắn hơn rất nhiều. Chương trình tập rất khoa học và phù hợp.",
-            rating: 5,
-          },
-          {
-            id: "2",
-            name: "Trần Văn Đức",
-            content:
-              "PT Phi rất nhiệt tình và chuyên nghiệp. Nhờ có sự hướng dẫn tận tình, tôi đã tăng được 5kg cơ trong 4 tháng.",
-            rating: 5,
-          },
-        ];
-        setTestimonials(defaultTestimonials);
-        localStorage.setItem("pt_testimonials", JSON.stringify(defaultTestimonials));
+      // Load contact info
+      const { data: contactInfoData } = await supabase
+        .from('contact_info')
+        .select('*')
+        .limit(1)
+        .single();
+      
+      if (contactInfoData) {
+        setContactInfo({
+          phone: contactInfoData.phone,
+          facebook: contactInfoData.facebook,
+          zalo: contactInfoData.zalo,
+          email: contactInfoData.email,
+        });
       }
 
-      const savedVideos = localStorage.getItem("pt_videos");
-      if (savedVideos) {
-        setVideos(JSON.parse(savedVideos));
-      } else {
-        // Set default videos
-        const defaultVideos: Video[] = [
-          {
-            id: "1",
-            title: "Bài tập cardio cơ bản tại nhà",
-            youtubeId: "dQw4w9WgXcQ",
-            description:
-              "Hướng dẫn các bài tập cardio đơn giản có thể thực hiện tại nhà",
-            category: "Cardio",
-          },
-          {
-            id: "2",
-            title: "Tập ngực cho người mới bắt đầu",
-            youtubeId: "dQw4w9WgXcQ",
-            description:
-              "Các bài tập phát triển cơ ngực hiệu quả dành cho newbie",
-            category: "Strength",
-          },
-        ];
-        setVideos(defaultVideos);
-        localStorage.setItem("pt_videos", JSON.stringify(defaultVideos));
-      }
+      // Load user-specific data if authenticated
+      if (user) {
+        // For now, use localStorage for complex data structures
+        // TODO: Implement proper database schema for workout plans, meal plans, etc.
+        const savedWorkoutPlans = localStorage.getItem("pt_workout_plans");
+        if (savedWorkoutPlans) {
+          setWorkoutPlans(JSON.parse(savedWorkoutPlans));
+        }
 
-      const savedContactInfo = localStorage.getItem("pt_contact_info");
-      if (savedContactInfo) {
-        setContactInfo(JSON.parse(savedContactInfo));
-      }
+        const savedMealPlans = localStorage.getItem("pt_meal_plans");
+        if (savedMealPlans) {
+          setMealPlans(JSON.parse(savedMealPlans));
+        }
 
-      const savedHomeContent = localStorage.getItem("pt_home_content");
-      if (savedHomeContent) {
-        setHomeContent(JSON.parse(savedHomeContent));
+        const savedWeightRecords = localStorage.getItem("pt_weight_records");
+        if (savedWeightRecords) {
+          setWeightRecords(JSON.parse(savedWeightRecords));
+        }
       }
     } catch (error) {
       console.error('Error loading data:', error);
@@ -336,54 +348,189 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({
     saveToLocalStorage("pt_weight_records", newRecords);
   };
 
-  const addTestimonial = (testimonial: Testimonial) => {
-    const newTestimonials = [...testimonials, testimonial];
-    setTestimonials(newTestimonials);
-    saveToLocalStorage("pt_testimonials", newTestimonials);
+  const addTestimonial = async (testimonial: Testimonial) => {
+    try {
+      const { data, error } = await supabase
+        .from('testimonials')
+        .insert({
+          name: testimonial.name,
+          content: testimonial.content,
+          rating: testimonial.rating,
+          avatar_url: testimonial.avatar,
+          before_image_url: testimonial.beforeImage,
+          after_image_url: testimonial.afterImage,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        const newTestimonial = {
+          id: data.id,
+          name: data.name,
+          content: data.content,
+          rating: data.rating,
+          avatar: data.avatar_url || undefined,
+          beforeImage: data.before_image_url || undefined,
+          afterImage: data.after_image_url || undefined,
+        };
+        setTestimonials([...testimonials, newTestimonial]);
+      }
+    } catch (error) {
+      console.error('Error adding testimonial:', error);
+    }
   };
 
-  const updateTestimonial = (id: string, updates: Partial<Testimonial>) => {
-    const newTestimonials = testimonials.map((t) =>
-      t.id === id ? { ...t, ...updates } : t
-    );
-    setTestimonials(newTestimonials);
-    saveToLocalStorage("pt_testimonials", newTestimonials);
+  const updateTestimonial = async (id: string, updates: Partial<Testimonial>) => {
+    try {
+      const { error } = await supabase
+        .from('testimonials')
+        .update({
+          name: updates.name,
+          content: updates.content,
+          rating: updates.rating,
+          avatar_url: updates.avatar,
+          before_image_url: updates.beforeImage,
+          after_image_url: updates.afterImage,
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      const newTestimonials = testimonials.map((t) =>
+        t.id === id ? { ...t, ...updates } : t
+      );
+      setTestimonials(newTestimonials);
+    } catch (error) {
+      console.error('Error updating testimonial:', error);
+    }
   };
 
-  const deleteTestimonial = (id: string) => {
-    const newTestimonials = testimonials.filter((t) => t.id !== id);
-    setTestimonials(newTestimonials);
-    saveToLocalStorage("pt_testimonials", newTestimonials);
+  const deleteTestimonial = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('testimonials')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      const newTestimonials = testimonials.filter((t) => t.id !== id);
+      setTestimonials(newTestimonials);
+    } catch (error) {
+      console.error('Error deleting testimonial:', error);
+    }
   };
 
-  const addVideo = (video: Video) => {
-    const newVideos = [...videos, video];
-    setVideos(newVideos);
-    saveToLocalStorage("pt_videos", newVideos);
+  const addVideo = async (video: Video) => {
+    try {
+      const { data, error } = await supabase
+        .from('videos')
+        .insert({
+          title: video.title,
+          youtube_id: video.youtubeId,
+          description: video.description,
+          category: video.category,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        const newVideo = {
+          id: data.id,
+          title: data.title,
+          youtubeId: data.youtube_id,
+          description: data.description,
+          category: data.category,
+        };
+        setVideos([...videos, newVideo]);
+      }
+    } catch (error) {
+      console.error('Error adding video:', error);
+    }
   };
 
-  const updateVideo = (id: string, updates: Partial<Video>) => {
-    const newVideos = videos.map((v) =>
-      v.id === id ? { ...v, ...updates } : v
-    );
-    setVideos(newVideos);
-    saveToLocalStorage("pt_videos", newVideos);
+  const updateVideo = async (id: string, updates: Partial<Video>) => {
+    try {
+      const { error } = await supabase
+        .from('videos')
+        .update({
+          title: updates.title,
+          youtube_id: updates.youtubeId,
+          description: updates.description,
+          category: updates.category,
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      const newVideos = videos.map((v) =>
+        v.id === id ? { ...v, ...updates } : v
+      );
+      setVideos(newVideos);
+    } catch (error) {
+      console.error('Error updating video:', error);
+    }
   };
 
-  const deleteVideo = (id: string) => {
-    const newVideos = videos.filter((v) => v.id !== id);
-    setVideos(newVideos);
-    saveToLocalStorage("pt_videos", newVideos);
+  const deleteVideo = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('videos')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      const newVideos = videos.filter((v) => v.id !== id);
+      setVideos(newVideos);
+    } catch (error) {
+      console.error('Error deleting video:', error);
+    }
   };
 
-  const updateContactInfo = (info: ContactInfo) => {
-    setContactInfo(info);
-    saveToLocalStorage("pt_contact_info", info);
+  const updateContactInfo = async (info: ContactInfo) => {
+    try {
+      const { error } = await supabase
+        .from('contact_info')
+        .upsert({
+          phone: info.phone,
+          facebook: info.facebook,
+          zalo: info.zalo,
+          email: info.email,
+        });
+
+      if (error) throw error;
+
+      setContactInfo(info);
+    } catch (error) {
+      console.error('Error updating contact info:', error);
+    }
   };
 
-  const updateHomeContent = (content: HomeContent) => {
-    setHomeContent(content);
-    saveToLocalStorage("pt_home_content", content);
+  const updateHomeContent = async (content: HomeContent) => {
+    try {
+      const { error } = await supabase
+        .from('home_content')
+        .upsert({
+          hero_title: content.heroTitle,
+          hero_subtitle: content.heroSubtitle,
+          hero_image_url: content.heroImage,
+          about_text: content.aboutText,
+          about_image_url: content.aboutImage,
+          services_title: content.servicesTitle,
+          services: content.services,
+        });
+
+      if (error) throw error;
+
+      setHomeContent(content);
+    } catch (error) {
+      console.error('Error updating home content:', error);
+    }
   };
 
   const createNewWeekPlan = (clientId: string, templatePlanId: string) => {

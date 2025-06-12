@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Plus,
   Edit,
@@ -9,6 +9,7 @@ import {
   Filter,
   X,
 } from "lucide-react";
+import { supabase } from "../../lib/supabase";
 
 interface User {
   id: string;
@@ -22,10 +23,8 @@ interface User {
 }
 
 const UserManagement: React.FC = () => {
-  const [users, setUsers] = useState<User[]>(() => {
-    const savedUsers = JSON.parse(localStorage.getItem("pt_users") || "[]");
-    return savedUsers.map((u: any) => ({ ...u, password: undefined }));
-  });
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -35,12 +34,47 @@ const UserManagement: React.FC = () => {
   const [formData, setFormData] = useState({
     email: "",
     password: "",
+    fullName: "",
+    phone: "",
     role: "client" as "admin" | "client",
   });
 
-  // Xoá xác nhận popup state
+  // Delete confirm popup state
   const [showDeletePopup, setShowDeletePopup] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
+
+  useEffect(() => {
+    loadUsers();
+  }, []);
+
+  const loadUsers = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      if (data) {
+        setUsers(data.map(u => ({
+          id: u.id,
+          username: u.username,
+          email: u.email,
+          fullName: u.full_name,
+          phone: u.phone || undefined,
+          role: u.role,
+          avatar: u.avatar_url || undefined,
+          startDate: u.start_date || undefined,
+        })));
+      }
+    } catch (error) {
+      console.error('Error loading users:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredUsers = users.filter((user) => {
     const matchesSearch =
@@ -51,7 +85,7 @@ const UserManagement: React.FC = () => {
     return matchesSearch && matchesRole;
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validate email format
@@ -66,83 +100,101 @@ const UserManagement: React.FC = () => {
       return;
     }
 
-    const allUsers = JSON.parse(localStorage.getItem("pt_users") || "[]");
+    try {
+      if (editingUser) {
+        // Update existing user
+        const { error } = await supabase
+          .from('users')
+          .update({
+            email: formData.email,
+            full_name: formData.fullName,
+            phone: formData.phone || null,
+            role: formData.role,
+          })
+          .eq('id', editingUser.id);
 
-    if (editingUser) {
-      // Update user
-      const updatedUsers = allUsers.map((u: any) =>
-        u.id === editingUser.id
-          ? {
-              ...u,
+        if (error) throw error;
+      } else {
+        // Create new user
+        // First create auth user
+        const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+          email: formData.email,
+          password: formData.password,
+          email_confirm: true,
+        });
+
+        if (authError) throw authError;
+
+        if (authData.user) {
+          // Generate username from email
+          const username = formData.email.split('@')[0];
+          let finalUsername = username;
+          let counter = 1;
+          
+          // Check if username already exists
+          while (users.find(u => u.username === finalUsername)) {
+            finalUsername = `${username}${counter}`;
+            counter++;
+          }
+
+          // Create user profile
+          const { error: profileError } = await supabase
+            .from('users')
+            .insert({
+              auth_user_id: authData.user.id,
+              username: finalUsername,
               email: formData.email,
+              full_name: formData.fullName,
+              phone: formData.phone || null,
               role: formData.role,
-              password: formData.password || u.password,
-            }
-          : u
-      );
-      localStorage.setItem("pt_users", JSON.stringify(updatedUsers));
-      setUsers(updatedUsers.map((u: any) => ({ ...u, password: undefined })));
-    } else {
-      // Check if email already exists
-      const existingUser = allUsers.find((u: any) => u.email === formData.email);
-      if (existingUser) {
-        alert('Email đã được sử dụng');
-        return;
+            });
+
+          if (profileError) throw profileError;
+        }
       }
 
-      // Generate username from email
-      const username = formData.email.split('@')[0];
-      
-      // Check if username already exists, if so add a number
-      let finalUsername = username;
-      let counter = 1;
-      while (allUsers.find((u: any) => u.username === finalUsername)) {
-        finalUsername = `${username}${counter}`;
-        counter++;
-      }
-
-      // Add new user
-      const newUser = {
-        id: `user-${Date.now()}`,
-        username: finalUsername,
-        email: formData.email,
-        fullName: formData.email.split('@')[0], // Use email prefix as default name
-        phone: '',
-        role: formData.role,
-        password: formData.password,
-        startDate: new Date().toISOString().split("T")[0],
-      };
-      const updatedUsers = [...allUsers, newUser];
-      localStorage.setItem("pt_users", JSON.stringify(updatedUsers));
-      setUsers(updatedUsers.map((u: any) => ({ ...u, password: undefined })));
+      await loadUsers();
+      resetForm();
+    } catch (error) {
+      console.error('Error saving user:', error);
+      alert('Có lỗi xảy ra khi lưu người dùng');
     }
-
-    resetForm();
   };
 
   const handleEdit = (user: User) => {
     setEditingUser(user);
     setFormData({
       email: user.email,
-      role: user.role,
       password: "",
+      fullName: user.fullName,
+      phone: user.phone || "",
+      role: user.role,
     });
     setShowForm(true);
   };
 
-  // Mở popup xác nhận xoá
   const handleDeleteClick = (user: User) => {
     setUserToDelete(user);
     setShowDeletePopup(true);
   };
 
-  // Xác nhận xoá
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!userToDelete) return;
-    const allUsers = JSON.parse(localStorage.getItem("pt_users") || "[]");
-    const updatedUsers = allUsers.filter((u: any) => u.id !== userToDelete.id);
-    localStorage.setItem("pt_users", JSON.stringify(updatedUsers));
-    setUsers(updatedUsers.map((u: any) => ({ ...u, password: undefined })));
+    
+    try {
+      const { error } = await supabase
+        .from('users')
+        .delete()
+        .eq('id', userToDelete.id);
+
+      if (error) throw error;
+
+      await loadUsers();
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      alert('Có lỗi xảy ra khi xóa người dùng');
+    }
+    
     setShowDeletePopup(false);
     setUserToDelete(null);
   };
@@ -156,11 +208,21 @@ const UserManagement: React.FC = () => {
     setFormData({
       email: "",
       password: "",
+      fullName: "",
+      phone: "",
       role: "client",
     });
     setEditingUser(null);
     setShowForm(false);
   };
+
+  if (loading) {
+    return (
+      <div className="p-8 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-fitness-red"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-8">
@@ -328,9 +390,37 @@ const UserManagement: React.FC = () => {
                     placeholder="Nhập email"
                     required
                   />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Tên đăng nhập và họ tên sẽ được tự động tạo từ email
-                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Họ và tên
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.fullName}
+                    onChange={(e) =>
+                      setFormData({ ...formData, fullName: e.target.value })
+                    }
+                    className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-fitness-red focus:border-transparent transition-all duration-200"
+                    placeholder="Nhập họ và tên"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Số điện thoại
+                  </label>
+                  <input
+                    type="tel"
+                    value={formData.phone}
+                    onChange={(e) =>
+                      setFormData({ ...formData, phone: e.target.value })
+                    }
+                    className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-fitness-red focus:border-transparent transition-all duration-200"
+                    placeholder="Nhập số điện thoại"
+                  />
                 </div>
 
                 <div>
@@ -366,15 +456,6 @@ const UserManagement: React.FC = () => {
                     <option value="client">🎯 Học viên</option>
                     <option value="admin">👑 Admin</option>
                   </select>
-                </div>
-
-                <div className="text-xs p-3 rounded border text-blue-700 bg-blue-50 border-blue-200">
-                  <strong>Lưu ý:</strong> Khi tạo người dùng mới, hệ thống sẽ tự động:
-                  <ul className="list-disc list-inside mt-1 space-y-1">
-                    <li>Tạo tên đăng nhập từ phần trước @ của email</li>
-                    <li>Sử dụng phần trước @ của email làm họ tên mặc định</li>
-                    <li>Gán vai trò đã chọn cho người dùng</li>
-                  </ul>
                 </div>
 
                 <div className="flex space-x-4 pt-6 border-t border-gray-200">
