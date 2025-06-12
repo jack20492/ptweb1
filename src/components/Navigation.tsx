@@ -11,10 +11,21 @@ const Navigation: React.FC = () => {
   const navigate = useNavigate();
   const [showLogin, setShowLogin] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  const handleLogout = () => {
-    logout();
-    navigate('/');
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await logout();
+      navigate('/');
+      // Hiển thị thông báo đăng xuất thành công
+      alert('Đăng xuất thành công!');
+    } catch (error) {
+      console.error('Logout error:', error);
+      alert('Có lỗi xảy ra khi đăng xuất. Vui lòng thử lại.');
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
 
   const isActive = (path: string) => location.pathname === path;
@@ -88,10 +99,11 @@ const Navigation: React.FC = () => {
                     </span>
                     <button
                       onClick={handleLogout}
-                      className="flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
+                      disabled={isLoggingOut}
+                      className="flex items-center space-x-1 px-4 py-2 rounded-md text-sm font-medium text-white bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
                     >
                       <LogOut className="h-4 w-4" />
-                      <span>Đăng xuất</span>
+                      <span>{isLoggingOut ? 'Đang đăng xuất...' : 'Đăng xuất'}</span>
                     </button>
                   </div>
                 </>
