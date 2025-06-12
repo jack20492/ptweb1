@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Dumbbell, Eye, EyeOff, User, Mail, Phone, UserPlus, Shield, CheckCircle, X } from 'lucide-react';
+import { Dumbbell, Eye, EyeOff, Mail, UserPlus, CheckCircle } from 'lucide-react';
 
 interface RegisterProps {
   onClose: () => void;
@@ -9,20 +9,15 @@ interface RegisterProps {
 
 const Register: React.FC<RegisterProps> = ({ onClose, onSwitchToLogin }) => {
   const [formData, setFormData] = useState({
-    username: '',
     email: '',
-    fullName: '',
-    phone: '',
     password: '',
-    confirmPassword: '',
-    role: 'client' as 'admin' | 'client'
+    confirmPassword: ''
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,27 +37,44 @@ const Register: React.FC<RegisterProps> = ({ onClose, onSwitchToLogin }) => {
       return;
     }
 
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      setError('Email không hợp lệ');
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
-      // Check if username or email already exists
+      // Check if email already exists
       const users = JSON.parse(localStorage.getItem('pt_users') || '[]');
-      const existingUser = users.find((u: any) => 
-        u.username === formData.username || u.email === formData.email
-      );
+      const existingUser = users.find((u: any) => u.email === formData.email);
 
       if (existingUser) {
-        setError('Tên đăng nhập hoặc email đã tồn tại');
+        setError('Email đã được sử dụng');
         setIsSubmitting(false);
         return;
+      }
+
+      // Generate username from email
+      const username = formData.email.split('@')[0];
+      
+      // Check if username already exists, if so add a number
+      let finalUsername = username;
+      let counter = 1;
+      while (users.find((u: any) => u.username === finalUsername)) {
+        finalUsername = `${username}${counter}`;
+        counter++;
       }
 
       // Create new user
       const newUser = {
         id: `user-${Date.now()}`,
-        username: formData.username,
+        username: finalUsername,
         email: formData.email,
-        fullName: formData.fullName,
-        phone: formData.phone,
-        role: formData.role,
+        fullName: formData.email.split('@')[0], // Use email prefix as default name
+        phone: '',
+        role: 'client',
         password: formData.password,
         startDate: new Date().toISOString().split('T')[0]
       };
@@ -71,9 +83,7 @@ const Register: React.FC<RegisterProps> = ({ onClose, onSwitchToLogin }) => {
       const updatedUsers = [...users, newUser];
       localStorage.setItem('pt_users', JSON.stringify(updatedUsers));
 
-      // Show custom success notification
-      const message = `Đăng ký ${formData.role === 'admin' ? 'tài khoản admin' : 'tài khoản học viên'} thành công! Bạn có thể đăng nhập ngay bây giờ.`;
-      setSuccessMessage(message);
+      // Show success notification
       setShowSuccess(true);
 
       // Auto redirect to login after 2 seconds
@@ -90,7 +100,7 @@ const Register: React.FC<RegisterProps> = ({ onClose, onSwitchToLogin }) => {
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value
@@ -109,7 +119,7 @@ const Register: React.FC<RegisterProps> = ({ onClose, onSwitchToLogin }) => {
             🎉 Đăng ký thành công!
           </h3>
           <p className="text-gray-600 mb-6 leading-relaxed">
-            {successMessage}
+            Tài khoản học viên đã được tạo thành công! Bạn có thể đăng nhập ngay bây giờ.
           </p>
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
             <p className="text-blue-800 text-sm">
@@ -145,38 +155,6 @@ const Register: React.FC<RegisterProps> = ({ onClose, onSwitchToLogin }) => {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                <User className="h-4 w-4 inline mr-1" />
-                Họ và tên
-              </label>
-              <input
-                type="text"
-                name="fullName"
-                value={formData.fullName}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-fitness-red focus:border-transparent"
-                placeholder="Nhập họ và tên"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                <User className="h-4 w-4 inline mr-1" />
-                Tên đăng nhập
-              </label>
-              <input
-                type="text"
-                name="username"
-                value={formData.username}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-fitness-red focus:border-transparent"
-                placeholder="Nhập tên đăng nhập"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
                 <Mail className="h-4 w-4 inline mr-1" />
                 Email
               </label>
@@ -186,47 +164,9 @@ const Register: React.FC<RegisterProps> = ({ onClose, onSwitchToLogin }) => {
                 value={formData.email}
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-fitness-red focus:border-transparent"
-                placeholder="Nhập email"
+                placeholder="Nhập email của bạn"
                 required
               />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                <Phone className="h-4 w-4 inline mr-1" />
-                Số điện thoại
-              </label>
-              <input
-                type="tel"
-                name="phone"
-                value={formData.phone}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-fitness-red focus:border-transparent"
-                placeholder="Nhập số điện thoại"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                <Shield className="h-4 w-4 inline mr-1" />
-                Loại tài khoản
-              </label>
-              <select
-                name="role"
-                value={formData.role}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-fitness-red focus:border-transparent"
-              >
-                <option value="client">🎯 Học viên</option>
-                <option value="admin">👑 Admin</option>
-              </select>
-              <p className="text-xs text-gray-500 mt-1">
-                {formData.role === 'admin' 
-                  ? 'Tài khoản admin có thể quản lý hệ thống và học viên' 
-                  : 'Tài khoản học viên để theo dõi chương trình tập luyện'
-                }
-              </p>
             </div>
 
             <div>
@@ -240,7 +180,7 @@ const Register: React.FC<RegisterProps> = ({ onClose, onSwitchToLogin }) => {
                   value={formData.password}
                   onChange={handleInputChange}
                   className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-fitness-red focus:border-transparent"
-                  placeholder="Nhập mật khẩu"
+                  placeholder="Nhập mật khẩu (tối thiểu 6 ký tự)"
                   required
                 />
                 <button
@@ -291,15 +231,8 @@ const Register: React.FC<RegisterProps> = ({ onClose, onSwitchToLogin }) => {
               </div>
             )}
 
-            <div className={`text-xs p-3 rounded border ${
-              formData.role === 'admin' 
-                ? 'text-orange-700 bg-orange-50 border-orange-200' 
-                : 'text-blue-700 bg-blue-50 border-blue-200'
-            }`}>
-              <strong>Lưu ý:</strong> {formData.role === 'admin' 
-                ? 'Tài khoản admin sẽ có quyền quản lý toàn bộ hệ thống, tạo bài tập và quản lý học viên.' 
-                : 'Sau khi đăng ký thành công, bạn sẽ có thể đăng nhập và theo dõi chương trình tập luyện do PT tạo cho bạn.'
-              }
+            <div className="text-xs p-3 rounded border text-blue-700 bg-blue-50 border-blue-200">
+              <strong>Lưu ý:</strong> Sau khi đăng ký thành công, bạn sẽ có thể đăng nhập và theo dõi chương trình tập luyện do PT tạo cho bạn. Tên đăng nhập sẽ được tự động tạo từ email của bạn.
             </div>
 
             <div className="flex space-x-3 pt-4">
