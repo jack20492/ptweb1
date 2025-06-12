@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Dumbbell, Eye, EyeOff, User, Mail, Phone, UserPlus, Shield, CheckCircle, X } from 'lucide-react';
+import { Dumbbell, Eye, EyeOff, User, Mail, Phone, UserPlus, Shield, CheckCircle, Loader2 } from 'lucide-react';
 
 interface RegisterProps {
   onClose: () => void;
@@ -23,6 +23,7 @@ const Register: React.FC<RegisterProps> = ({ onClose, onSwitchToLogin }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const { register } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,46 +44,27 @@ const Register: React.FC<RegisterProps> = ({ onClose, onSwitchToLogin }) => {
     }
 
     try {
-      // Check if username or email already exists
-      const users = JSON.parse(localStorage.getItem('pt_users') || '[]');
-      const existingUser = users.find((u: any) => 
-        u.username === formData.username || u.email === formData.email
-      );
-
-      if (existingUser) {
-        setError('Tên đăng nhập hoặc email đã tồn tại');
-        setIsSubmitting(false);
-        return;
-      }
-
-      // Create new user
-      const newUser = {
-        id: `user-${Date.now()}`,
+      const success = await register(formData.email, formData.password, {
         username: formData.username,
-        email: formData.email,
-        fullName: formData.fullName,
+        full_name: formData.fullName,
         phone: formData.phone,
-        role: formData.role,
-        password: formData.password,
-        startDate: new Date().toISOString().split('T')[0]
-      };
+        role: formData.role
+      });
 
-      // Save to localStorage
-      const updatedUsers = [...users, newUser];
-      localStorage.setItem('pt_users', JSON.stringify(updatedUsers));
+      if (success) {
+        const message = `Đăng ký ${formData.role === 'admin' ? 'tài khoản admin' : 'tài khoản học viên'} thành công! Bạn có thể đăng nhập ngay bây giờ.`;
+        setSuccessMessage(message);
+        setShowSuccess(true);
 
-      // Show custom success notification
-      const message = `Đăng ký ${formData.role === 'admin' ? 'tài khoản admin' : 'tài khoản học viên'} thành công! Bạn có thể đăng nhập ngay bây giờ.`;
-      setSuccessMessage(message);
-      setShowSuccess(true);
-
-      // Auto redirect to login after 2 seconds
-      setTimeout(() => {
-        setShowSuccess(false);
-        onClose();
-        onSwitchToLogin();
-      }, 2000);
-
+        // Auto redirect to login after 2 seconds
+        setTimeout(() => {
+          setShowSuccess(false);
+          onClose();
+          onSwitchToLogin();
+        }, 2000);
+      } else {
+        setError('Có lỗi xảy ra khi đăng ký. Vui lòng thử lại.');
+      }
     } catch (error) {
       setError('Có lỗi xảy ra. Vui lòng thử lại.');
     } finally {
@@ -100,7 +82,7 @@ const Register: React.FC<RegisterProps> = ({ onClose, onSwitchToLogin }) => {
   // Success notification popup
   if (showSuccess) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 text-center">
           <div className="bg-green-100 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-6">
             <CheckCircle className="h-12 w-12 text-green-600" />
@@ -132,7 +114,7 @@ const Register: React.FC<RegisterProps> = ({ onClose, onSwitchToLogin }) => {
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="p-6">
           <div className="flex items-center justify-center mb-6">
@@ -156,6 +138,7 @@ const Register: React.FC<RegisterProps> = ({ onClose, onSwitchToLogin }) => {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-fitness-red focus:border-transparent"
                 placeholder="Nhập họ và tên"
                 required
+                disabled={isSubmitting}
               />
             </div>
 
@@ -172,6 +155,7 @@ const Register: React.FC<RegisterProps> = ({ onClose, onSwitchToLogin }) => {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-fitness-red focus:border-transparent"
                 placeholder="Nhập tên đăng nhập"
                 required
+                disabled={isSubmitting}
               />
             </div>
 
@@ -188,6 +172,7 @@ const Register: React.FC<RegisterProps> = ({ onClose, onSwitchToLogin }) => {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-fitness-red focus:border-transparent"
                 placeholder="Nhập email"
                 required
+                disabled={isSubmitting}
               />
             </div>
 
@@ -204,6 +189,7 @@ const Register: React.FC<RegisterProps> = ({ onClose, onSwitchToLogin }) => {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-fitness-red focus:border-transparent"
                 placeholder="Nhập số điện thoại"
                 required
+                disabled={isSubmitting}
               />
             </div>
 
@@ -217,6 +203,7 @@ const Register: React.FC<RegisterProps> = ({ onClose, onSwitchToLogin }) => {
                 value={formData.role}
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-fitness-red focus:border-transparent"
+                disabled={isSubmitting}
               >
                 <option value="client">🎯 Học viên</option>
                 <option value="admin">👑 Admin</option>
@@ -242,11 +229,13 @@ const Register: React.FC<RegisterProps> = ({ onClose, onSwitchToLogin }) => {
                   className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-fitness-red focus:border-transparent"
                   placeholder="Nhập mật khẩu"
                   required
+                  disabled={isSubmitting}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  disabled={isSubmitting}
                 >
                   {showPassword ? (
                     <EyeOff className="h-4 w-4 text-gray-400" />
@@ -270,11 +259,13 @@ const Register: React.FC<RegisterProps> = ({ onClose, onSwitchToLogin }) => {
                   className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-fitness-red focus:border-transparent"
                   placeholder="Nhập lại mật khẩu"
                   required
+                  disabled={isSubmitting}
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  disabled={isSubmitting}
                 >
                   {showConfirmPassword ? (
                     <EyeOff className="h-4 w-4 text-gray-400" />
@@ -314,9 +305,16 @@ const Register: React.FC<RegisterProps> = ({ onClose, onSwitchToLogin }) => {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="flex-1 px-4 py-2 bg-gradient-to-r from-fitness-red to-red-600 text-white rounded-md hover:from-red-600 hover:to-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-4 py-2 bg-gradient-to-r from-fitness-red to-red-600 text-white rounded-md hover:from-red-600 hover:to-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
               >
-                {isSubmitting ? 'Đang đăng ký...' : 'Đăng ký'}
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Đang đăng ký...
+                  </>
+                ) : (
+                  'Đăng ký'
+                )}
               </button>
             </div>
 
@@ -330,6 +328,7 @@ const Register: React.FC<RegisterProps> = ({ onClose, onSwitchToLogin }) => {
                     onSwitchToLogin();
                   }}
                   className="text-fitness-red hover:text-red-700 font-medium"
+                  disabled={isSubmitting}
                 >
                   Đăng nhập ngay
                 </button>

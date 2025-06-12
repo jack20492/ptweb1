@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import type { 
   Profile, 
@@ -392,6 +392,46 @@ export const useSupabase = () => {
     }
   };
 
+  // Meal functions
+  const createMeal = async (meal: Omit<Meal, 'id' | 'created_at'>) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data, error } = await supabase
+        .from('meals')
+        .insert(meal)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      handleError(error);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Meal food functions
+  const createMealFood = async (mealFood: Omit<MealFood, 'id' | 'created_at'>) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data, error } = await supabase
+        .from('meal_foods')
+        .insert(mealFood)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      handleError(error);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Weight record functions
   const getWeightRecords = async (clientId?: string): Promise<WeightRecord[]> => {
     setLoading(true);
@@ -445,6 +485,24 @@ export const useSupabase = () => {
         .from('testimonials')
         .select('*')
         .eq('is_published', true)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      handleError(error);
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getAllTestimonials = async (): Promise<Testimonial[]> => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data, error } = await supabase
+        .from('testimonials')
+        .select('*')
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data || [];
@@ -522,6 +580,24 @@ export const useSupabase = () => {
         .from('videos')
         .select('*')
         .eq('is_published', true)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      handleError(error);
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getAllVideos = async (): Promise<Video[]> => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data, error } = await supabase
+        .from('videos')
+        .select('*')
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data || [];
@@ -697,16 +773,22 @@ export const useSupabase = () => {
     createMealPlan,
     updateMealPlan,
     deleteMealPlan,
+    // Meals
+    createMeal,
+    // Meal foods
+    createMealFood,
     // Weight records
     getWeightRecords,
     createWeightRecord,
     // Testimonials
     getTestimonials,
+    getAllTestimonials,
     createTestimonial,
     updateTestimonial,
     deleteTestimonial,
     // Videos
     getVideos,
+    getAllVideos,
     createVideo,
     updateVideo,
     deleteVideo,

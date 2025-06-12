@@ -1,22 +1,19 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { supabase } from '../lib/supabase';
+import { useSupabase } from '../hooks/useSupabase';
+import type { Profile } from '../lib/supabase';
 
-interface User {
-  id: string;
-  username: string;
+interface User extends Profile {
   email: string;
-  role: 'admin' | 'client';
-  fullName: string;
-  phone?: string;
-  avatar?: string;
-  currentPlan?: string;
-  startDate?: string;
 }
 
 interface AuthContextType {
   user: User | null;
-  login: (username: string, password: string) => boolean;
-  logout: () => void;
+  login: (email: string, password: string) => Promise<boolean>;
+  register: (email: string, password: string, userData: any) => Promise<boolean>;
+  logout: () => Promise<void>;
   isAdmin: boolean;
+  loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -35,55 +32,88 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const { signIn, signUp, signOut, getProfile } = useSupabase();
 
   useEffect(() => {
-    // Initialize default admin account
-    const users = JSON.parse(localStorage.getItem('pt_users') || '[]');
-    if (users.length === 0) {
-      const defaultAdmin: User = {
-        id: 'admin-1',
-        username: 'admin',
-        email: 'admin@phinpt.com',
-        role: 'admin',
-        fullName: 'Phi Nguyễn PT',
-        phone: '0123456789'
-      };
-      const userWithPassword = { ...defaultAdmin, password: 'admin123' };
-      localStorage.setItem('pt_users', JSON.stringify([userWithPassword]));
-    }
+    // Get initial session
+    const getInitialSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const profile = await getProfile(session.user.id);
+        if (profile) {
+          setUser({
+            ...profile,
+            email: session.user.email || ''
+          });
+        }
+      }
+      setLoading(false);
+    };
 
-    // Check if user is logged in
-    const savedUser = localStorage.getItem('pt_current_user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
-  }, []);
+    getInitialSession();
 
-  const login = (username: string, password: string): boolean => {
-    const users = JSON.parse(localStorage.getItem('pt_users') || '[]');
-    const foundUser = users.find((u: any) => 
-      (u.username === username || u.email === username) && u.password === password
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === 'SIGNED_IN' && session?.user) {
+          const profile = await getProfile(session.user.id);
+          if (profile) {
+            setUser({
+              ...profile,
+              email: session.user.email || ''
+            });
+          }
+        } else if (event === 'SIGNED_OUT') {
+          setUser(null);
+        }
+        setLoading(false);
+      }
     );
 
-    if (foundUser) {
-      const userWithoutPassword = { ...foundUser };
-      delete userWithoutPassword.password;
-      setUser(userWithoutPassword);
-      localStorage.setItem('pt_current_user', JSON.stringify(userWithoutPassword));
-      return true;
+    return () => subscription.unsubscribe();
+  }, [getProfile]);
+
+  const login = async (email: string, password: string): Promise<boolean> => {
+    try {
+      const result = await signIn(email, password);
+      return !!result?.user;
+    } catch (error) {
+      console.error('Login error:', error);
+      return false;
     }
-    return false;
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('pt_current_user');
+  const register = async (email: string, password: string, userData: any): Promise<boolean> => {
+    try {
+      const result = await signUp(email, password, userData);
+      return !!result?.user;
+    } catch (error) {
+      console.error('Register error:', error);
+      return false;
+    }
+  };
+
+  const logout = async (): Promise<void> => {
+    try {
+      await signOut();
+      setUser(null);
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
 
   const isAdmin = user?.role === 'admin';
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isAdmin }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      login, 
+      register, 
+      logout, 
+      isAdmin, 
+      loading 
+    }}>
       {children}
     </AuthContext.Provider>
   );

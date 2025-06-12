@@ -6,15 +6,29 @@ import Navigation from './components/Navigation';
 import Home from './pages/Home';
 import AdminDashboard from './pages/AdminDashboard';
 import ClientDashboard from './pages/ClientDashboard';
+import { Loader2 } from 'lucide-react';
+
+const LoadingScreen: React.FC = () => (
+  <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+    <div className="text-center">
+      <Loader2 className="h-12 w-12 animate-spin text-fitness-red mx-auto mb-4" />
+      <p className="text-gray-600">Đang tải...</p>
+    </div>
+  </div>
+);
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode; adminOnly?: boolean }> = ({ 
   children, 
   adminOnly = false 
 }) => {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, loading } = useAuth();
+  
+  if (loading) {
+    return <LoadingScreen />;
+  }
   
   if (!user) {
-    return <Navigate to="/\" replace />;
+    return <Navigate to="/" replace />;
   }
   
   if (adminOnly && !isAdmin) {
@@ -25,7 +39,11 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; adminOnly?: boolean 
 };
 
 const AppRoutes: React.FC = () => {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, loading } = useAuth();
+
+  if (loading) {
+    return <LoadingScreen />;
+  }
 
   return (
     <Router>
@@ -45,11 +63,11 @@ const AppRoutes: React.FC = () => {
             path="/dashboard" 
             element={
               <ProtectedRoute>
-                {isAdmin ? <Navigate to="/admin\" replace /> : <ClientDashboard />}
+                {isAdmin ? <Navigate to="/admin" replace /> : <ClientDashboard />}
               </ProtectedRoute>
             } 
           />
-          <Route path="*" element={<Navigate to="/\" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>
     </Router>
