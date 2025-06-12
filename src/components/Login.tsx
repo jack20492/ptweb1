@@ -4,9 +4,10 @@ import { Dumbbell, Eye, EyeOff } from 'lucide-react';
 
 interface LoginProps {
   onClose: () => void;
+  onSwitchToRegister?: () => void;
 }
 
-const Login: React.FC<LoginProps> = ({ onClose }) => {
+const Login: React.FC<LoginProps> = ({ onClose, onSwitchToRegister }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -102,6 +103,24 @@ const Login: React.FC<LoginProps> = ({ onClose }) => {
                 Đăng nhập
               </button>
             </div>
+
+            {onSwitchToRegister && (
+              <div className="text-center pt-4 border-t border-gray-200">
+                <p className="text-sm text-gray-600">
+                  Chưa có tài khoản?{' '}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onSwitchToRegister();
+                    }}
+                    className="text-fitness-red hover:text-red-700 font-medium"
+                  >
+                    Đăng ký ngay
+                  </button>
+                </p>
+              </div>
+            )}
           </form>
         </div>
       </div>

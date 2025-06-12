@@ -1,19 +1,21 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Dumbbell, Eye, EyeOff, User, Mail, Phone, UserPlus } from 'lucide-react';
+import { Dumbbell, Eye, EyeOff, User, Mail, Phone, UserPlus, Shield } from 'lucide-react';
 
 interface RegisterProps {
   onClose: () => void;
+  onSwitchToLogin: () => void;
 }
 
-const Register: React.FC<RegisterProps> = ({ onClose }) => {
+const Register: React.FC<RegisterProps> = ({ onClose, onSwitchToLogin }) => {
   const [formData, setFormData] = useState({
     username: '',
     email: '',
     fullName: '',
     phone: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    role: 'client' as 'admin' | 'client'
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -58,7 +60,7 @@ const Register: React.FC<RegisterProps> = ({ onClose }) => {
         email: formData.email,
         fullName: formData.fullName,
         phone: formData.phone,
-        role: 'client',
+        role: formData.role,
         password: formData.password,
         startDate: new Date().toISOString().split('T')[0]
       };
@@ -67,9 +69,10 @@ const Register: React.FC<RegisterProps> = ({ onClose }) => {
       const updatedUsers = [...users, newUser];
       localStorage.setItem('pt_users', JSON.stringify(updatedUsers));
 
-      // Show success message
-      alert('Đăng ký thành công! Bạn có thể đăng nhập ngay bây giờ.');
+      // Show success message and redirect to login
+      alert(`Đăng ký ${formData.role === 'admin' ? 'tài khoản admin' : 'tài khoản học viên'} thành công! Bạn có thể đăng nhập ngay bây giờ.`);
       onClose();
+      onSwitchToLogin();
     } catch (error) {
       setError('Có lỗi xảy ra. Vui lòng thử lại.');
     } finally {
@@ -77,7 +80,7 @@ const Register: React.FC<RegisterProps> = ({ onClose }) => {
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value
@@ -162,6 +165,28 @@ const Register: React.FC<RegisterProps> = ({ onClose }) => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
+                <Shield className="h-4 w-4 inline mr-1" />
+                Loại tài khoản
+              </label>
+              <select
+                name="role"
+                value={formData.role}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-fitness-red focus:border-transparent"
+              >
+                <option value="client">🎯 Học viên</option>
+                <option value="admin">👑 Admin</option>
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                {formData.role === 'admin' 
+                  ? 'Tài khoản admin có thể quản lý hệ thống và học viên' 
+                  : 'Tài khoản học viên để theo dõi chương trình tập luyện'
+                }
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 Mật khẩu
               </label>
               <div className="relative">
@@ -222,8 +247,15 @@ const Register: React.FC<RegisterProps> = ({ onClose }) => {
               </div>
             )}
 
-            <div className="text-xs text-gray-500 bg-blue-50 p-3 rounded border border-blue-200">
-              <strong>Lưu ý:</strong> Sau khi đăng ký thành công, bạn sẽ có thể đăng nhập và theo dõi chương trình tập luyện do PT tạo cho bạn.
+            <div className={`text-xs p-3 rounded border ${
+              formData.role === 'admin' 
+                ? 'text-orange-700 bg-orange-50 border-orange-200' 
+                : 'text-blue-700 bg-blue-50 border-blue-200'
+            }`}>
+              <strong>Lưu ý:</strong> {formData.role === 'admin' 
+                ? 'Tài khoản admin sẽ có quyền quản lý toàn bộ hệ thống, tạo bài tập và quản lý học viên.' 
+                : 'Sau khi đăng ký thành công, bạn sẽ có thể đăng nhập và theo dõi chương trình tập luyện do PT tạo cho bạn.'
+              }
             </div>
 
             <div className="flex space-x-3 pt-4">
@@ -242,6 +274,22 @@ const Register: React.FC<RegisterProps> = ({ onClose }) => {
               >
                 {isSubmitting ? 'Đang đăng ký...' : 'Đăng ký'}
               </button>
+            </div>
+
+            <div className="text-center pt-4 border-t border-gray-200">
+              <p className="text-sm text-gray-600">
+                Đã có tài khoản?{' '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onSwitchToLogin();
+                  }}
+                  className="text-fitness-red hover:text-red-700 font-medium"
+                >
+                  Đăng nhập ngay
+                </button>
+              </p>
             </div>
           </form>
         </div>

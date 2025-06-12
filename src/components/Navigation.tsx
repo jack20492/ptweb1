@@ -19,6 +19,16 @@ const Navigation: React.FC = () => {
 
   const isActive = (path: string) => location.pathname === path;
 
+  const handleSwitchToLogin = () => {
+    setShowRegister(false);
+    setShowLogin(true);
+  };
+
+  const handleSwitchToRegister = () => {
+    setShowLogin(false);
+    setShowRegister(true);
+  };
+
   return (
     <>
       <nav className="bg-fitness-black shadow-lg">
@@ -108,8 +118,18 @@ const Navigation: React.FC = () => {
         </div>
       </nav>
 
-      {showLogin && <Login onClose={() => setShowLogin(false)} />}
-      {showRegister && <Register onClose={() => setShowRegister(false)} />}
+      {showLogin && (
+        <Login 
+          onClose={() => setShowLogin(false)} 
+          onSwitchToRegister={handleSwitchToRegister}
+        />
+      )}
+      {showRegister && (
+        <Register 
+          onClose={() => setShowRegister(false)} 
+          onSwitchToLogin={handleSwitchToLogin}
+        />
+      )}
     </>
   );
 };
