@@ -40,7 +40,7 @@ export const authService = {
               .from('users')
               .select('username')
               .eq('username', finalUsername)
-              .single();
+              .maybeSingle();
 
             if (!existingUser) break;
             finalUsername = `${username}${counter}`;
@@ -107,7 +107,7 @@ export const authService = {
         .from('users')
         .select('*')
         .eq('auth_user_id', user.id)
-        .single();
+        .maybeSingle();
 
       return profile;
     } catch (error) {
@@ -582,9 +582,25 @@ export const contentService = {
       const { data, error } = await supabase
         .from('home_content')
         .select('*')
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
+
+      if (!data) {
+        // Return default content if no data found
+        return {
+          heroTitle: "Phi Nguyễn Personal Trainer",
+          heroSubtitle: "Chuyên gia huấn luyện cá nhân - Giúp bạn đạt được mục tiêu fitness",
+          aboutText: "Với hơn 5 năm kinh nghiệm trong lĩnh vực fitness, tôi cam kết mang đến cho bạn chương trình tập luyện hiệu quả và phù hợp nhất.",
+          servicesTitle: "Dịch vụ của tôi",
+          services: [
+            "Tư vấn chế độ tập luyện cá nhân",
+            "Thiết kế chương trình dinh dưỡng",
+            "Theo dõi tiến độ và điều chỉnh",
+            "Hỗ trợ 24/7 qua các kênh liên lạc",
+          ],
+        };
+      }
 
       return {
         heroTitle: data.hero_title,
@@ -615,6 +631,35 @@ export const contentService = {
 
   async updateHomeContent(contentData: any) {
     try {
+      // First try to get existing content ID
+      const { data: existingContent } = await supabase
+        .from('home_content')
+        .select('id')
+        .maybeSingle();
+
+      let contentId = existingContent?.id;
+
+      if (!contentId) {
+        // Create new content if none exists
+        const { data: newContent, error: createError } = await supabase
+          .from('home_content')
+          .insert({
+            hero_title: contentData.heroTitle,
+            hero_subtitle: contentData.heroSubtitle,
+            hero_image_url: contentData.heroImage,
+            about_text: contentData.aboutText,
+            about_image_url: contentData.aboutImage,
+            services_title: contentData.servicesTitle,
+            services: contentData.services,
+          })
+          .select()
+          .single();
+
+        if (createError) throw createError;
+        return newContent;
+      }
+
+      // Update existing content
       const { data, error } = await supabase
         .from('home_content')
         .update({
@@ -626,7 +671,7 @@ export const contentService = {
           services_title: contentData.servicesTitle,
           services: contentData.services,
         })
-        .eq('id', (await supabase.from('home_content').select('id').single()).data?.id)
+        .eq('id', contentId)
         .select()
         .single();
 
@@ -642,9 +687,20 @@ export const contentService = {
       const { data, error } = await supabase
         .from('contact_info')
         .select('*')
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
+
+      if (!data) {
+        // Return default contact info if no data found
+        return {
+          phone: "0123456789",
+          facebook: "https://facebook.com/phinpt",
+          zalo: "https://zalo.me/0123456789",
+          email: "contact@phinpt.com",
+        };
+      }
+
       return data;
     } catch (error) {
       handleApiError(error, 'Get contact info');
@@ -660,10 +716,31 @@ export const contentService = {
 
   async updateContactInfo(contactData: any) {
     try {
+      // First try to get existing contact info ID
+      const { data: existingContact } = await supabase
+        .from('contact_info')
+        .select('id')
+        .maybeSingle();
+
+      let contactId = existingContact?.id;
+
+      if (!contactId) {
+        // Create new contact info if none exists
+        const { data: newContact, error: createError } = await supabase
+          .from('contact_info')
+          .insert(contactData)
+          .select()
+          .single();
+
+        if (createError) throw createError;
+        return newContact;
+      }
+
+      // Update existing contact info
       const { data, error } = await supabase
         .from('contact_info')
         .update(contactData)
-        .eq('id', (await supabase.from('contact_info').select('id').single()).data?.id)
+        .eq('id', contactId)
         .select()
         .single();
 

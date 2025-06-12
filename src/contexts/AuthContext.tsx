@@ -71,7 +71,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 .from('users')
                 .select('*')
                 .eq('auth_user_id', session.user.id)
-                .single();
+                .maybeSingle();
 
               if (profile) {
                 const userData = {
@@ -129,7 +129,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 .from('users')
                 .select('*')
                 .eq('auth_user_id', data.user.id)
-                .single();
+                .maybeSingle();
 
               if (profile) {
                 const userData = {
