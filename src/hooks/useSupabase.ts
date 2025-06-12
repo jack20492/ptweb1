@@ -35,6 +35,38 @@ export const useSupabase = () => {
     setLoading(false);
   };
 
+  // Helper function to check if input is email or username
+  const isEmail = (input: string): boolean => {
+    return input.includes('@') && input.includes('.');
+  };
+
+  // Helper function to get user email by username
+  const getUserEmailByUsername = async (username: string): Promise<string | null> => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('username', username)
+        .single();
+      
+      if (error || !data) {
+        return null;
+      }
+
+      // Get the email from auth.users table using the user ID
+      const { data: authData, error: authError } = await supabase.auth.admin.getUserById(data.id);
+      
+      if (authError || !authData.user) {
+        return null;
+      }
+
+      return authData.user.email || null;
+    } catch (error) {
+      console.error('Error getting user email by username:', error);
+      return null;
+    }
+  };
+
   // Auth functions with improved error handling
   const signUp = async (email: string, password: string, userData: any) => {
     setLoading(true);
@@ -93,17 +125,30 @@ export const useSupabase = () => {
     }
   };
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (emailOrUsername: string, password: string) => {
     setLoading(true);
     setError(null);
     try {
       // Validate input
-      if (!email || !password) {
-        throw new Error('Email và mật khẩu là bắt buộc');
+      if (!emailOrUsername || !password) {
+        throw new Error('Email/tên đăng nhập và mật khẩu là bắt buộc');
+      }
+
+      let email = emailOrUsername.trim();
+
+      // If input is not an email, try to get email by username
+      if (!isEmail(emailOrUsername)) {
+        const userEmail = await getUserEmailByUsername(emailOrUsername.trim());
+        if (!userEmail) {
+          throw new Error('Tên đăng nhập không tồn tại. Vui lòng kiểm tra lại.');
+        }
+        email = userEmail;
+      } else {
+        email = emailOrUsername.trim().toLowerCase();
       }
 
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
+        email,
         password
       });
       
@@ -112,7 +157,7 @@ export const useSupabase = () => {
         
         // Provide more user-friendly error messages in Vietnamese
         if (error.message === 'Invalid login credentials') {
-          throw new Error('Email hoặc mật khẩu không đúng. Vui lòng kiểm tra lại thông tin đăng nhập.');
+          throw new Error('Email/tên đăng nhập hoặc mật khẩu không đúng. Vui lòng kiểm tra lại thông tin đăng nhập.');
         } else if (error.message.includes('Email not confirmed')) {
           throw new Error('Tài khoản chưa được xác thực. Vui lòng kiểm tra email để xác thực tài khoản.');
         } else if (error.message.includes('Too many requests')) {

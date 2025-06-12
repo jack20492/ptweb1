@@ -8,7 +8,7 @@ interface LoginProps {
 }
 
 const Login: React.FC<LoginProps> = ({ onClose, onSwitchToRegister }) => {
-  const [email, setEmail] = useState('');
+  const [emailOrUsername, setEmailOrUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
@@ -21,12 +21,12 @@ const Login: React.FC<LoginProps> = ({ onClose, onSwitchToRegister }) => {
     setIsLoading(true);
     
     try {
-      const success = await login(email, password);
+      const success = await login(emailOrUsername, password);
       if (success) {
         onClose();
       } else {
         // Hiển thị thông báo lỗi cụ thể
-        setError('Email hoặc mật khẩu không đúng. Vui lòng kiểm tra lại thông tin đăng nhập.');
+        setError('Email/tên đăng nhập hoặc mật khẩu không đúng. Vui lòng kiểm tra lại thông tin đăng nhập.');
       }
     } catch (err: any) {
       // Xử lý các loại lỗi khác nhau
@@ -34,8 +34,9 @@ const Login: React.FC<LoginProps> = ({ onClose, onSwitchToRegister }) => {
       
       if (err?.message) {
         if (err.message.includes('Invalid login credentials') || 
-            err.message.includes('Invalid email or password')) {
-          errorMessage = 'Email hoặc mật khẩu không đúng. Vui lòng kiểm tra lại thông tin đăng nhập.';
+            err.message.includes('Invalid email or password') ||
+            err.message.includes('Email/tên đăng nhập hoặc mật khẩu không đúng')) {
+          errorMessage = 'Email/tên đăng nhập hoặc mật khẩu không đúng. Vui lòng kiểm tra lại thông tin đăng nhập.';
         } else if (err.message.includes('Email not confirmed')) {
           errorMessage = 'Tài khoản chưa được xác thực. Vui lòng kiểm tra email để xác thực tài khoản.';
         } else if (err.message.includes('Too many requests')) {
@@ -67,17 +68,20 @@ const Login: React.FC<LoginProps> = ({ onClose, onSwitchToRegister }) => {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email
+                Email hoặc Tên đăng nhập
               </label>
               <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                type="text"
+                value={emailOrUsername}
+                onChange={(e) => setEmailOrUsername(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-fitness-red focus:border-transparent"
-                placeholder="Nhập email"
+                placeholder="Nhập email hoặc tên đăng nhập"
                 required
                 disabled={isLoading}
               />
+              <p className="text-xs text-gray-500 mt-1">
+                Bạn có thể đăng nhập bằng email hoặc tên đăng nhập
+              </p>
             </div>
 
             <div>
@@ -128,6 +132,7 @@ const Login: React.FC<LoginProps> = ({ onClose, onSwitchToRegister }) => {
             <div className="text-xs text-gray-500 bg-gray-50 p-3 rounded">
               <strong>Tài khoản demo:</strong><br />
               Email: admin@phinpt.com<br />
+              Username: admin<br />
               Password: admin123
             </div>
 

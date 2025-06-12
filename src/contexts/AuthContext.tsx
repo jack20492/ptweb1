@@ -9,7 +9,7 @@ interface User extends Profile {
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (emailOrUsername: string, password: string) => Promise<boolean>;
   register: (email: string, password: string, userData: any) => Promise<boolean>;
   logout: () => Promise<void>;
   isAdmin: boolean;
@@ -93,10 +93,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return () => subscription.unsubscribe();
   }, [getProfile]);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const login = async (emailOrUsername: string, password: string): Promise<boolean> => {
     try {
       setLoading(true);
-      const result = await signIn(email, password);
+      const result = await signIn(emailOrUsername, password);
       
       if (result?.user) {
         // The auth state change listener will handle setting the user
