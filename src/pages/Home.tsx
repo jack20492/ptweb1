@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useRef } from "react";
 import { useData } from "../contexts/DataContext";
 import { useAuth } from "../contexts/AuthContext";
 import {
@@ -14,12 +14,10 @@ import {
   Users,
   Award,
 } from "lucide-react";
-import Login from "../components/Login";
 
 const Home: React.FC = () => {
   const { testimonials, videos, contactInfo, homeContent } = useData();
   const { user } = useAuth();
-  const [showLogin, setShowLogin] = useState(false);
   const contactRef = useRef<HTMLElement>(null);
 
   const scrollToContact = () => {
@@ -64,25 +62,8 @@ const Home: React.FC = () => {
               {homeContent.heroSubtitle}
             </p>
 
-            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center">
-              {!user && (
-                <button
-                  onClick={() => setShowLogin(true)}
-                  className="group bg-gradient-to-r from-fitness-gold to-yellow-500 hover:from-yellow-500 hover:to-fitness-gold text-fitness-black font-bold py-2 sm:py-3 px-4 sm:px-6 rounded-lg text-sm sm:text-base transition-all duration-300 transform hover:scale-105 shadow-xl flex items-center space-x-2 w-full sm:w-auto"
-                >
-                  <span>Đăng nhập ngay</span>
-                  <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5 group-hover:translate-x-1 transition-transform" />
-                </button>
-              )}
-              <button
-                onClick={scrollToContact}
-                className="group bg-gradient-to-r from-fitness-red to-red-600 hover:from-red-600 hover:to-fitness-red text-white font-bold py-2 sm:py-3 px-4 sm:px-6 rounded-lg text-sm sm:text-base transition-all duration-300 transform hover:scale-105 shadow-xl flex items-center space-x-2 w-full sm:w-auto"
-              >
-                <span>Liên hệ ngay</span>
-                <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5 group-hover:translate-x-1 transition-transform" />
-              </button>
-
-              <div className="flex flex-wrap justify-center items-center space-x-4 sm:space-x-6 text-xs sm:text-sm mt-4 sm:mt-0">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center mb-8 sm:mb-12">
+              <div className="flex flex-wrap justify-center items-center space-x-4 sm:space-x-6 text-xs sm:text-sm">
                 <div className="flex items-center space-x-2">
                   <Users className="h-4 w-4 sm:h-5 sm:w-5 text-fitness-gold" />
                   <span>100+ Học viên</span>
@@ -92,6 +73,16 @@ const Home: React.FC = () => {
                   <span>5+ Năm kinh nghiệm</span>
                 </div>
               </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center">
+              <button
+                onClick={scrollToContact}
+                className="group bg-gradient-to-r from-fitness-red to-red-600 hover:from-red-600 hover:to-fitness-red text-white font-bold py-2 sm:py-3 px-4 sm:px-6 rounded-lg text-sm sm:text-base transition-all duration-300 transform hover:scale-105 shadow-xl flex items-center space-x-2 w-full sm:w-auto"
+              >
+                <span>Liên hệ ngay</span>
+                <ArrowRight className="h-4 w-4 sm:h-5 sm:w-5 group-hover:translate-x-1 transition-transform" />
+              </button>
             </div>
           </div>
         </div>
@@ -389,8 +380,6 @@ const Home: React.FC = () => {
           </div>
         </section>
       </div>
-
-      {showLogin && <Login onClose={() => setShowLogin(false)} />}
     </div>
   );
 };
