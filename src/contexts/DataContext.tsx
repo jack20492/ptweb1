@@ -5,6 +5,13 @@ import React, {
   useEffect,
   ReactNode,
 } from "react";
+import { useAuth } from './AuthContext';
+import {
+  workoutService,
+  mealPlanService,
+  weightService,
+  contentService,
+} from '../services/api';
 
 interface Exercise {
   id: string;
@@ -105,23 +112,25 @@ interface DataContextType {
   videos: Video[];
   contactInfo: ContactInfo;
   homeContent: HomeContent;
-  addWorkoutPlan: (plan: WorkoutPlan) => void;
-  updateWorkoutPlan: (planId: string, updates: Partial<WorkoutPlan>) => void;
-  deleteWorkoutPlan: (planId: string) => void;
-  addMealPlan: (plan: MealPlan) => void;
-  updateMealPlan: (planId: string, updates: Partial<MealPlan>) => void;
-  deleteMealPlan: (planId: string) => void;
-  addWeightRecord: (record: WeightRecord) => void;
-  addTestimonial: (testimonial: Testimonial) => void;
-  updateTestimonial: (id: string, updates: Partial<Testimonial>) => void;
-  deleteTestimonial: (id: string) => void;
-  addVideo: (video: Video) => void;
-  updateVideo: (id: string, updates: Partial<Video>) => void;
-  deleteVideo: (id: string) => void;
-  updateContactInfo: (info: ContactInfo) => void;
-  updateHomeContent: (content: HomeContent) => void;
-  createNewWeekPlan: (clientId: string, templatePlanId: string) => void;
-  duplicateWorkoutPlan: (planId: string, assignClientId: string) => void;
+  loading: boolean;
+  addWorkoutPlan: (plan: WorkoutPlan) => Promise<void>;
+  updateWorkoutPlan: (planId: string, updates: Partial<WorkoutPlan>) => Promise<void>;
+  deleteWorkoutPlan: (planId: string) => Promise<void>;
+  addMealPlan: (plan: MealPlan) => Promise<void>;
+  updateMealPlan: (planId: string, updates: Partial<MealPlan>) => Promise<void>;
+  deleteMealPlan: (planId: string) => Promise<void>;
+  addWeightRecord: (record: WeightRecord) => Promise<void>;
+  addTestimonial: (testimonial: Testimonial) => Promise<void>;
+  updateTestimonial: (id: string, updates: Partial<Testimonial>) => Promise<void>;
+  deleteTestimonial: (id: string) => Promise<void>;
+  addVideo: (video: Video) => Promise<void>;
+  updateVideo: (id: string, updates: Partial<Video>) => Promise<void>;
+  deleteVideo: (id: string) => Promise<void>;
+  updateContactInfo: (info: ContactInfo) => Promise<void>;
+  updateHomeContent: (content: HomeContent) => Promise<void>;
+  createNewWeekPlan: (clientId: string, templatePlanId: string) => Promise<void>;
+  duplicateWorkoutPlan: (planId: string, assignClientId: string) => Promise<void>;
+  refreshData: () => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | null>(null);
@@ -137,6 +146,7 @@ export const useData = () => {
 export const DataProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
+  const { user, isAdmin } = useAuth();
   const [workoutPlans, setWorkoutPlans] = useState<WorkoutPlan[]>([]);
   const [mealPlans, setMealPlans] = useState<MealPlan[]>([]);
   const [weightRecords, setWeightRecords] = useState<WeightRecord[]>([]);
@@ -162,225 +172,274 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({
       "Hỗ trợ 24/7 qua các kênh liên lạc",
     ],
   });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const savedWorkoutPlans = localStorage.getItem("pt_workout_plans");
-    if (savedWorkoutPlans) setWorkoutPlans(JSON.parse(savedWorkoutPlans));
-    const savedMealPlans = localStorage.getItem("pt_meal_plans");
-    if (savedMealPlans) setMealPlans(JSON.parse(savedMealPlans));
-    const savedWeightRecords = localStorage.getItem("pt_weight_records");
-    if (savedWeightRecords) setWeightRecords(JSON.parse(savedWeightRecords));
-    const savedTestimonials = localStorage.getItem("pt_testimonials");
-    if (savedTestimonials) {
-      setTestimonials(JSON.parse(savedTestimonials));
+    if (user) {
+      loadData();
     } else {
-      const defaultTestimonials: Testimonial[] = [
-        {
-          id: "1",
-          name: "Nguyễn Minh Anh",
-          content:
-            "Sau 3 tháng tập với PT Phi, tôi đã giảm được 8kg và cảm thấy khỏe khoắn hơn rất nhiều. Chương trình tập rất khoa học và phù hợp.",
-          rating: 5,
-        },
-        {
-          id: "2",
-          name: "Trần Văn Đức",
-          content:
-            "PT Phi rất nhiệt tình và chuyên nghiệp. Nhờ có sự hướng dẫn tận tình, tôi đã tăng được 5kg cơ trong 4 tháng.",
-          rating: 5,
-        },
-      ];
-      setTestimonials(defaultTestimonials);
-      localStorage.setItem(
-        "pt_testimonials",
-        JSON.stringify(defaultTestimonials)
+      // Load public data even when not logged in
+      loadPublicData();
+    }
+  }, [user, isAdmin]);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      await Promise.all([
+        loadWorkoutPlans(),
+        loadMealPlans(),
+        loadWeightRecords(),
+        loadPublicData(),
+      ]);
+    } catch (error) {
+      console.error('Error loading data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadPublicData = async () => {
+    try {
+      const [homeData, contactData, testimonialsData, videosData] = await Promise.all([
+        contentService.getHomeContent(),
+        contentService.getContactInfo(),
+        contentService.getTestimonials(),
+        contentService.getVideos(),
+      ]);
+
+      setHomeContent(homeData);
+      setContactInfo(contactData);
+      setTestimonials(testimonialsData);
+      setVideos(videosData);
+    } catch (error) {
+      console.error('Error loading public data:', error);
+    } finally {
+      if (!user) {
+        setLoading(false);
+      }
+    }
+  };
+
+  const loadWorkoutPlans = async () => {
+    try {
+      const plans = await workoutService.getWorkoutPlans(
+        isAdmin ? undefined : user?.id
       );
+      setWorkoutPlans(plans);
+    } catch (error) {
+      console.error('Error loading workout plans:', error);
     }
-    const savedVideos = localStorage.getItem("pt_videos");
-    if (savedVideos) {
-      setVideos(JSON.parse(savedVideos));
-    } else {
-      const defaultVideos: Video[] = [
-        {
-          id: "1",
-          title: "Bài tập cardio cơ bản tại nhà",
-          youtubeId: "dQw4w9WgXcQ",
-          description:
-            "Hướng dẫn các bài tập cardio đơn giản có thể thực hiện tại nhà",
-          category: "Cardio",
-        },
-        {
-          id: "2",
-          title: "Tập ngực cho người mới bắt đầu",
-          youtubeId: "dQw4w9WgXcQ",
-          description:
-            "Các bài tập phát triển cơ ngực hiệu quả dành cho newbie",
-          category: "Strength",
-        },
-      ];
-      setVideos(defaultVideos);
-      localStorage.setItem("pt_videos", JSON.stringify(defaultVideos));
+  };
+
+  const loadMealPlans = async () => {
+    try {
+      const plans = await mealPlanService.getMealPlans(
+        isAdmin ? undefined : user?.id
+      );
+      setMealPlans(plans);
+    } catch (error) {
+      console.error('Error loading meal plans:', error);
     }
-    const savedContactInfo = localStorage.getItem("pt_contact_info");
-    if (savedContactInfo) setContactInfo(JSON.parse(savedContactInfo));
-    const savedHomeContent = localStorage.getItem("pt_home_content");
-    if (savedHomeContent) setHomeContent(JSON.parse(savedHomeContent));
-  }, []);
-
-  const saveToLocalStorage = (key: string, data: any) => {
-    localStorage.setItem(key, JSON.stringify(data));
   };
 
-  const addWorkoutPlan = (plan: WorkoutPlan) => {
-    const newPlans = [...workoutPlans, plan];
-    setWorkoutPlans(newPlans);
-    saveToLocalStorage("pt_workout_plans", newPlans);
+  const loadWeightRecords = async () => {
+    if (!user) return;
+    
+    try {
+      const records = await weightService.getWeightRecords(user.id);
+      setWeightRecords(records);
+    } catch (error) {
+      console.error('Error loading weight records:', error);
+    }
   };
 
-  const updateWorkoutPlan = (planId: string, updates: Partial<WorkoutPlan>) => {
-    const newPlans = workoutPlans.map((plan) =>
-      plan.id === planId ? { ...plan, ...updates } : plan
-    );
-    setWorkoutPlans(newPlans);
-    saveToLocalStorage("pt_workout_plans", newPlans);
+  const addWorkoutPlan = async (plan: WorkoutPlan) => {
+    try {
+      await workoutService.createWorkoutPlan(plan);
+      await loadWorkoutPlans();
+    } catch (error) {
+      console.error('Error adding workout plan:', error);
+      throw error;
+    }
   };
 
-  const deleteWorkoutPlan = (planId: string) => {
-    const newPlans = workoutPlans.filter((plan) => plan.id !== planId);
-    setWorkoutPlans(newPlans);
-    saveToLocalStorage("pt_workout_plans", newPlans);
+  const updateWorkoutPlan = async (planId: string, updates: Partial<WorkoutPlan>) => {
+    try {
+      await workoutService.updateWorkoutPlan(planId, updates);
+      await loadWorkoutPlans();
+    } catch (error) {
+      console.error('Error updating workout plan:', error);
+      throw error;
+    }
   };
 
-  const duplicateWorkoutPlan = (planId: string, assignClientId: string) => {
-    const plan = workoutPlans.find((p) => p.id === planId);
-    if (!plan || !assignClientId) return;
-    const newPlan: WorkoutPlan = {
-      ...plan,
-      id: `plan-${Date.now()}`,
-      clientId: assignClientId,
-      weekNumber: 1,
-      startDate: new Date().toISOString().split("T")[0],
-      createdBy: "admin",
-      days: plan.days.map((day) => ({
-        ...day,
-        exercises: day.exercises.map((ex) => ({
-          ...ex,
-          id: `exercise-${Date.now()}-${Math.random()}`,
-          sets: ex.sets.map((set) => ({
-            ...set,
-            reality: set.reps,
-            weight: set.weight || 0,
-            volume: set.reps * (set.weight || 0),
-          })),
-        })),
-      })),
-    };
-    addWorkoutPlan(newPlan);
+  const deleteWorkoutPlan = async (planId: string) => {
+    try {
+      await workoutService.deleteWorkoutPlan(planId);
+      await loadWorkoutPlans();
+    } catch (error) {
+      console.error('Error deleting workout plan:', error);
+      throw error;
+    }
   };
 
-  const addMealPlan = (plan: MealPlan) => {
-    const newPlans = [...mealPlans, plan];
-    setMealPlans(newPlans);
-    saveToLocalStorage("pt_meal_plans", newPlans);
+  const duplicateWorkoutPlan = async (planId: string, assignClientId: string) => {
+    try {
+      await workoutService.duplicateWorkoutPlan(planId, assignClientId);
+      await loadWorkoutPlans();
+    } catch (error) {
+      console.error('Error duplicating workout plan:', error);
+      throw error;
+    }
   };
 
-  const updateMealPlan = (planId: string, updates: Partial<MealPlan>) => {
-    const newPlans = mealPlans.map((plan) =>
-      plan.id === planId ? { ...plan, ...updates } : plan
-    );
-    setMealPlans(newPlans);
-    saveToLocalStorage("pt_meal_plans", newPlans);
+  const addMealPlan = async (plan: MealPlan) => {
+    try {
+      await mealPlanService.createMealPlan(plan);
+      await loadMealPlans();
+    } catch (error) {
+      console.error('Error adding meal plan:', error);
+      throw error;
+    }
   };
 
-  const deleteMealPlan = (planId: string) => {
-    const newPlans = mealPlans.filter((plan) => plan.id !== planId);
-    setMealPlans(newPlans);
-    saveToLocalStorage("pt_meal_plans", newPlans);
+  const updateMealPlan = async (planId: string, updates: Partial<MealPlan>) => {
+    try {
+      await mealPlanService.updateMealPlan(planId, updates);
+      await loadMealPlans();
+    } catch (error) {
+      console.error('Error updating meal plan:', error);
+      throw error;
+    }
   };
 
-  const addWeightRecord = (record: WeightRecord) => {
-    const newRecords = [...weightRecords, record];
-    setWeightRecords(newRecords);
-    saveToLocalStorage("pt_weight_records", newRecords);
+  const deleteMealPlan = async (planId: string) => {
+    try {
+      await mealPlanService.deleteMealPlan(planId);
+      await loadMealPlans();
+    } catch (error) {
+      console.error('Error deleting meal plan:', error);
+      throw error;
+    }
   };
 
-  const addTestimonial = (testimonial: Testimonial) => {
-    const newTestimonials = [...testimonials, testimonial];
-    setTestimonials(newTestimonials);
-    saveToLocalStorage("pt_testimonials", newTestimonials);
+  const addWeightRecord = async (record: WeightRecord) => {
+    try {
+      await weightService.addWeightRecord(record);
+      await loadWeightRecords();
+    } catch (error) {
+      console.error('Error adding weight record:', error);
+      throw error;
+    }
   };
 
-  const updateTestimonial = (id: string, updates: Partial<Testimonial>) => {
-    const newTestimonials = testimonials.map((t) =>
-      t.id === id ? { ...t, ...updates } : t
-    );
-    setTestimonials(newTestimonials);
-    saveToLocalStorage("pt_testimonials", newTestimonials);
+  const addTestimonial = async (testimonial: Testimonial) => {
+    try {
+      await contentService.createTestimonial(testimonial);
+      await loadPublicData();
+    } catch (error) {
+      console.error('Error adding testimonial:', error);
+      throw error;
+    }
   };
 
-  const deleteTestimonial = (id: string) => {
-    const newTestimonials = testimonials.filter((t) => t.id !== id);
-    setTestimonials(newTestimonials);
-    saveToLocalStorage("pt_testimonials", newTestimonials);
+  const updateTestimonial = async (id: string, updates: Partial<Testimonial>) => {
+    try {
+      await contentService.updateTestimonial(id, updates);
+      await loadPublicData();
+    } catch (error) {
+      console.error('Error updating testimonial:', error);
+      throw error;
+    }
   };
 
-  const addVideo = (video: Video) => {
-    const newVideos = [...videos, video];
-    setVideos(newVideos);
-    saveToLocalStorage("pt_videos", newVideos);
+  const deleteTestimonial = async (id: string) => {
+    try {
+      await contentService.deleteTestimonial(id);
+      await loadPublicData();
+    } catch (error) {
+      console.error('Error deleting testimonial:', error);
+      throw error;
+    }
   };
 
-  const updateVideo = (id: string, updates: Partial<Video>) => {
-    const newVideos = videos.map((v) =>
-      v.id === id ? { ...v, ...updates } : v
-    );
-    setVideos(newVideos);
-    saveToLocalStorage("pt_videos", newVideos);
+  const addVideo = async (video: Video) => {
+    try {
+      await contentService.createVideo(video);
+      await loadPublicData();
+    } catch (error) {
+      console.error('Error adding video:', error);
+      throw error;
+    }
   };
 
-  const deleteVideo = (id: string) => {
-    const newVideos = videos.filter((v) => v.id !== id);
-    setVideos(newVideos);
-    saveToLocalStorage("pt_videos", newVideos);
+  const updateVideo = async (id: string, updates: Partial<Video>) => {
+    try {
+      await contentService.updateVideo(id, updates);
+      await loadPublicData();
+    } catch (error) {
+      console.error('Error updating video:', error);
+      throw error;
+    }
   };
 
-  const updateContactInfo = (info: ContactInfo) => {
-    setContactInfo(info);
-    saveToLocalStorage("pt_contact_info", info);
+  const deleteVideo = async (id: string) => {
+    try {
+      await contentService.deleteVideo(id);
+      await loadPublicData();
+    } catch (error) {
+      console.error('Error deleting video:', error);
+      throw error;
+    }
   };
 
-  const updateHomeContent = (content: HomeContent) => {
-    setHomeContent(content);
-    saveToLocalStorage("pt_home_content", content);
+  const updateContactInfo = async (info: ContactInfo) => {
+    try {
+      await contentService.updateContactInfo(info);
+      setContactInfo(info);
+    } catch (error) {
+      console.error('Error updating contact info:', error);
+      throw error;
+    }
   };
 
-  const createNewWeekPlan = (clientId: string, templatePlanId: string) => {
-    const templatePlan = workoutPlans.find((p) => p.id === templatePlanId);
-    if (!templatePlan) return;
-    const clientPlans = workoutPlans.filter((p) => p.clientId === clientId);
-    const newWeekNumber =
-      Math.max(...clientPlans.map((p) => p.weekNumber), 0) + 1;
-    const newPlan: WorkoutPlan = {
-      ...templatePlan,
-      id: `${clientId}-week-${newWeekNumber}-${Date.now()}`,
-      weekNumber: newWeekNumber,
-      startDate: new Date().toISOString().split("T")[0],
-      days: templatePlan.days.map((day) => ({
-        ...day,
-        exercises: day.exercises.map((exercise) => ({
-          ...exercise,
-          id: `exercise-${Date.now()}-${Math.random()}`,
-          sets: exercise.sets.map((set) => ({
-            ...set,
-            reality: set.reps,
-            weight: set.weight || 0,
-            volume: set.reps * (set.weight || 0),
-          })),
-        })),
-      })),
-      createdBy: "client",
-    };
-    addWorkoutPlan(newPlan);
+  const updateHomeContent = async (content: HomeContent) => {
+    try {
+      await contentService.updateHomeContent(content);
+      setHomeContent(content);
+    } catch (error) {
+      console.error('Error updating home content:', error);
+      throw error;
+    }
+  };
+
+  const createNewWeekPlan = async (clientId: string, templatePlanId: string) => {
+    try {
+      const templatePlan = workoutPlans.find((p) => p.id === templatePlanId);
+      if (!templatePlan) return;
+
+      const clientPlans = workoutPlans.filter((p) => p.clientId === clientId);
+      const newWeekNumber =
+        Math.max(...clientPlans.map((p) => p.weekNumber), 0) + 1;
+
+      const newPlan: WorkoutPlan = {
+        ...templatePlan,
+        id: `${clientId}-week-${newWeekNumber}-${Date.now()}`,
+        weekNumber: newWeekNumber,
+        startDate: new Date().toISOString().split("T")[0],
+        createdBy: "client",
+      };
+
+      await addWorkoutPlan(newPlan);
+    } catch (error) {
+      console.error('Error creating new week plan:', error);
+      throw error;
+    }
+  };
+
+  const refreshData = async () => {
+    await loadData();
   };
 
   return (
@@ -393,6 +452,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({
         videos,
         contactInfo,
         homeContent,
+        loading,
         addWorkoutPlan,
         updateWorkoutPlan,
         deleteWorkoutPlan,
@@ -410,6 +470,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({
         updateHomeContent,
         createNewWeekPlan,
         duplicateWorkoutPlan,
+        refreshData,
       }}
     >
       {children}

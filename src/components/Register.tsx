@@ -18,6 +18,7 @@ const Register: React.FC<RegisterProps> = ({ onClose, onSwitchToLogin }) => {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const { register } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,62 +38,19 @@ const Register: React.FC<RegisterProps> = ({ onClose, onSwitchToLogin }) => {
       return;
     }
 
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.email)) {
-      setError('Email không hợp lệ');
-      setIsSubmitting(false);
-      return;
-    }
-
     try {
-      // Check if email already exists
-      const users = JSON.parse(localStorage.getItem('pt_users') || '[]');
-      const existingUser = users.find((u: any) => u.email === formData.email);
-
-      if (existingUser) {
-        setError('Email đã được sử dụng');
-        setIsSubmitting(false);
-        return;
+      const success = await register(formData.email, formData.password);
+      if (success) {
+        setShowSuccess(true);
+        // Auto redirect to login after 2 seconds
+        setTimeout(() => {
+          setShowSuccess(false);
+          onClose();
+          onSwitchToLogin();
+        }, 2000);
+      } else {
+        setError('Email đã được sử dụng hoặc có lỗi xảy ra');
       }
-
-      // Generate username from email
-      const username = formData.email.split('@')[0];
-      
-      // Check if username already exists, if so add a number
-      let finalUsername = username;
-      let counter = 1;
-      while (users.find((u: any) => u.username === finalUsername)) {
-        finalUsername = `${username}${counter}`;
-        counter++;
-      }
-
-      // Create new user
-      const newUser = {
-        id: `user-${Date.now()}`,
-        username: finalUsername,
-        email: formData.email,
-        fullName: formData.email.split('@')[0], // Use email prefix as default name
-        phone: '',
-        role: 'client',
-        password: formData.password,
-        startDate: new Date().toISOString().split('T')[0]
-      };
-
-      // Save to localStorage
-      const updatedUsers = [...users, newUser];
-      localStorage.setItem('pt_users', JSON.stringify(updatedUsers));
-
-      // Show success notification
-      setShowSuccess(true);
-
-      // Auto redirect to login after 2 seconds
-      setTimeout(() => {
-        setShowSuccess(false);
-        onClose();
-        onSwitchToLogin();
-      }, 2000);
-
     } catch (error) {
       setError('Có lỗi xảy ra. Vui lòng thử lại.');
     } finally {

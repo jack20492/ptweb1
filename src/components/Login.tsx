@@ -8,20 +8,29 @@ interface LoginProps {
 }
 
 const Login: React.FC<LoginProps> = ({ onClose, onSwitchToRegister }) => {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { login } = useAuth();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setIsSubmitting(true);
     
-    if (login(username, password)) {
-      onClose();
-    } else {
-      setError('Tên đăng nhập hoặc mật khẩu không đúng');
+    try {
+      const success = await login(email, password);
+      if (success) {
+        onClose();
+      } else {
+        setError('Email hoặc mật khẩu không đúng');
+      }
+    } catch (error) {
+      setError('Có lỗi xảy ra. Vui lòng thử lại.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -37,14 +46,14 @@ const Login: React.FC<LoginProps> = ({ onClose, onSwitchToRegister }) => {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Tên đăng nhập
+                Email
               </label>
               <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-fitness-red focus:border-transparent"
-                placeholder="Nhập tên đăng nhập hoặc email"
+                placeholder="Nhập email của bạn"
                 required
               />
             </div>
@@ -82,25 +91,21 @@ const Login: React.FC<LoginProps> = ({ onClose, onSwitchToRegister }) => {
               </div>
             )}
 
-            <div className="text-xs text-gray-500 bg-gray-50 p-3 rounded">
-              <strong>Tài khoản mặc định:</strong><br />
-              Username: admin<br />
-              Password: admin123
-            </div>
-
             <div className="flex space-x-3">
               <button
                 type="button"
                 onClick={onClose}
                 className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+                disabled={isSubmitting}
               >
                 Hủy
               </button>
               <button
                 type="submit"
-                className="flex-1 px-4 py-2 bg-fitness-red text-white rounded-md hover:bg-red-700 transition-colors"
+                disabled={isSubmitting}
+                className="flex-1 px-4 py-2 bg-fitness-red text-white rounded-md hover:bg-red-700 transition-colors disabled:opacity-50"
               >
-                Đăng nhập
+                {isSubmitting ? 'Đang đăng nhập...' : 'Đăng nhập'}
               </button>
             </div>
 
