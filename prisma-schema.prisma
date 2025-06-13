@@ -1,0 +1,208 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  CLIENT
+}
+
+enum MacroType {
+  CARB
+  PRO
+  FAT
+}
+
+model User {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  email     String   @unique
+  password  String
+  fullName  String   @map("full_name")
+  phone     String?
+  role      UserRole @default(CLIENT)
+  avatarUrl String?  @map("avatar_url")
+  startDate DateTime @default(now()) @map("start_date")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  workoutPlans   WorkoutPlan[]
+  mealPlans      MealPlan[]
+  weightRecords  WeightRecord[]
+  createdPlans   WorkoutPlan[] @relation("CreatedBy")
+
+  @@map("users")
+}
+
+model WorkoutPlan {
+  id         String   @id @default(cuid())
+  name       String
+  clientId   String   @map("client_id")
+  weekNumber Int      @map("week_number")
+  startDate  DateTime @map("start_date")
+  createdBy  String?  @map("created_by")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  client    User        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  creator   User?       @relation("CreatedBy", fields: [createdBy], references: [id])
+  exercises Exercise[]
+
+  @@map("workout_plans")
+}
+
+model Exercise {
+  id            String   @id @default(cuid())
+  workoutPlanId String   @map("workout_plan_id")
+  dayName       String   @map("day_name")
+  isRestDay     Boolean  @default(false) @map("is_rest_day")
+  exerciseName  String?  @map("exercise_name")
+  exerciseOrder Int      @default(0) @map("exercise_order")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  // Relations
+  workoutPlan WorkoutPlan    @relation(fields: [workoutPlanId], references: [id], onDelete: Cascade)
+  sets        ExerciseSet[]
+
+  @@map("exercises")
+}
+
+model ExerciseSet {
+  id          String  @id @default(cuid())
+  exerciseId  String  @map("exercise_id")
+  setNumber   Int     @map("set_number")
+  targetReps  Int     @map("target_reps")
+  actualReps  Int?    @map("actual_reps")
+  weightKg    Float?  @default(0) @map("weight_kg")
+  volume      Float?  @default(0)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  exercise Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  @@map("exercise_sets")
+}
+
+model MealPlan {
+  id            String   @id @default(cuid())
+  name          String   @default("Meal Plan")
+  clientId      String   @map("client_id")
+  totalCalories Int      @default(0) @map("total_calories")
+  notes         String?  @db.Text
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  client User   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  meals  Meal[]
+
+  @@map("meal_plans")
+}
+
+model Meal {
+  id            String   @id @default(cuid())
+  mealPlanId    String   @map("meal_plan_id")
+  name          String
+  totalCalories Int      @default(0) @map("total_calories")
+  mealOrder     Int      @default(0) @map("meal_order")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  // Relations
+  mealPlan MealPlan   @relation(fields: [mealPlanId], references: [id], onDelete: Cascade)
+  foods    MealFood[]
+
+  @@map("meals")
+}
+
+model MealFood {
+  id        String    @id @default(cuid())
+  mealId    String    @map("meal_id")
+  name      String
+  macroType MacroType @default(CARB) @map("macro_type")
+  calories  Int       @default(0)
+  notes     String?
+  foodOrder Int       @default(0) @map("food_order")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  meal Meal @relation(fields: [mealId], references: [id], onDelete: Cascade)
+
+  @@map("meal_foods")
+}
+
+model WeightRecord {
+  id         String   @id @default(cuid())
+  clientId   String   @map("client_id")
+  weightKg   Float    @map("weight_kg")
+  recordDate DateTime @map("record_date")
+  notes      String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  // Relations
+  client User @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@map("weight_records")
+}
+
+model Testimonial {
+  id             String   @id @default(cuid())
+  name           String
+  content        String   @db.Text
+  rating         Int      @default(5)
+  avatarUrl      String?  @map("avatar_url")
+  beforeImageUrl String?  @map("before_image_url")
+  afterImageUrl  String?  @map("after_image_url")
+  isPublished    Boolean  @default(true) @map("is_published")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@map("testimonials")
+}
+
+model Video {
+  id          String   @id @default(cuid())
+  title       String
+  youtubeId   String   @map("youtube_id")
+  description String   @db.Text
+  category    String   @default("General")
+  isPublished Boolean  @default(true) @map("is_published")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("videos")
+}
+
+model ContactInfo {
+  id          String   @id @default(cuid())
+  phone       String
+  facebookUrl String   @map("facebook_url")
+  zaloUrl     String   @map("zalo_url")
+  email       String
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("contact_info")
+}
+
+model HomeContent {
+  id             String   @id @default(cuid())
+  heroTitle      String   @map("hero_title")
+  heroSubtitle   String   @map("hero_subtitle") @db.Text
+  heroImageUrl   String?  @map("hero_image_url")
+  aboutText      String   @map("about_text") @db.Text
+  aboutImageUrl  String?  @map("about_image_url")
+  servicesTitle  String   @map("services_title")
+  services       Json     @default("[]")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@map("home_content")
+}
